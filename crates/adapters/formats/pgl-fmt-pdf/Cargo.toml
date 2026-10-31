@@ -6,10 +6,10 @@ description = "Adaptador PDF (reflow, overlay, OCR)"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
-pgl-fmt-core = { path = "../pgl-fmt-core" }
-pgl-app = { path = "../../../app/pgl-app" }
-pgl-domain = { path = "../../../domain/pgl-domain" }
-pdfium-render = { workspace = true, features = ["bind_to_system_library"] }
+pgl-fmt-core = { workspace = true }
+pgl-app = { workspace = true }
+pgl-domain = { workspace = true }
+pdfium-render = { workspace = true }
 lopdf = { workspace = true }
 thiserror = { workspace = true }
 anyhow = { workspace = true }

@@ -6,14 +6,15 @@ description = "Test kit: FakeProvider determinístico, fixtures, helpers"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
-pgl-app = { path = "../../../app/pgl-app" }
-pgl-domain = { path = "../../../domain/pgl-domain" }
+pgl-app = { workspace = true }
+pgl-domain = { workspace = true }
 async-trait = { workspace = true }
 serde = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 uuid = { workspace = true }
-anyhow = { workspace = thiserror = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
 
 [dev-dependencies]
 insta = { workspace = true }

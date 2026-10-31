@@ -1,0 +1,24 @@
+[package]
+name = "pgl-engine"
+version = "0.1.0"
+edition = "2021"
+description = "Processo isolado de inferência (llama.cpp)"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+pgl-app = { workspace = true }
+pgl-domain = { workspace = true }
+llama-cpp-2 = { workspace = true, features = ["cuda"] }
+async-trait = { workspace = true }
+thiserror = { workspace = true }
+serde = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+insta = { workspace = true }
+
+[[bin]]
+name = "pgl-engine"
+path = "src/main.rs"
+

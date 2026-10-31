@@ -49,7 +49,7 @@ impl Unit {
         source_ref.hash(&mut hasher);
         text.hash(&mut hasher);
         let hash = hasher.finish();
-        let id = UnitId::from_hash(&hash.to_le_bytes());
+        let id = UnitId::from_hash(hash);
 
         Self {
             id,
@@ -135,6 +135,22 @@ pub enum PlaceholderError {
 
     #[error("Unknown placeholder: {0}")]
     UnknownPlaceholder(String),
+}
+
+impl From<super::marked_text::PlaceholderValidationError> for PlaceholderError {
+    fn from(e: super::marked_text::PlaceholderValidationError) -> Self {
+        match e {
+            super::marked_text::PlaceholderValidationError::CountMismatch { expected, found } => {
+                PlaceholderError::CountMismatch { expected, found }
+            }
+            super::marked_text::PlaceholderValidationError::OrderMismatch { position, expected, found } => {
+                PlaceholderError::OrderMismatch { position, expected, found }
+            }
+            super::marked_text::PlaceholderValidationError::NestingViolation(msg) => {
+                PlaceholderError::NestingViolation(msg)
+            }
+        }
+    }
 }
 
 #[cfg(test)]

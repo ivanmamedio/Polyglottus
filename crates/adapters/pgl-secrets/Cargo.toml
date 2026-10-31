@@ -6,7 +6,7 @@ description = "Adaptador de segredos (cofre do sistema via keyring)"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
-pgl-app = { path = "../../../app/pgl-app" }
+pgl-app = { workspace = true }
 keyring = { workspace = true }
 async-trait = { workspace = true }
 thiserror = { workspace = true }

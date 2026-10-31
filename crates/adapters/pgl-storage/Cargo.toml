@@ -6,8 +6,8 @@ description = "Adaptador de armazenamento SQLite (projetos, jobs, unidades, glos
 license = "MIT OR Apache-2.0"
 
 [dependencies]
-pgl-app = { path = "../../../app/pgl-app" }
-pgl-domain = { path = "../../../domain/pgl-domain" }
+pgl-app = { workspace = true }
+pgl-domain = { workspace = true }
 rusqlite = { workspace = true }
 sqlx = { workspace = true }
 async-trait = { workspace = true }
@@ -19,7 +19,6 @@ uuid = { workspace = true }
 chrono = { workspace = true }
 anyhow = { workspace = true }
 tracing = { workspace = true }
-std::path::PathBuf
 
 [dev-dependencies]
 insta = { workspace = true }

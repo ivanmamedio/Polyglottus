@@ -312,7 +312,7 @@ use std::collections::HashMap;
 use super::Language;
 
 fn default_common_words() -> HashMap<Language, HashSet<String>> {
-    let mut map = HashMap::new();
+    let mut map: HashMap<Language, HashSet<String>> = HashMap::new();
 
     // Português
     map.insert(Language::new("pt"), [

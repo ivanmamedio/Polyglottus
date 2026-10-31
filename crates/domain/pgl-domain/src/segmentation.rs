@@ -1,6 +1,6 @@
 //! Segmentação de texto para tradução com contexto
 
-use super::{MarkedText, Unit, UnitId, UnitKind, SectionId, SourceRef};
+use super::{MarkedText, Unit, UnitId, UnitKind, SectionId, SourceRef, unit};
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 
@@ -107,12 +107,12 @@ impl Segmenter {
 
             let marked = MarkedText::new(part);
             segments.push(Segment {
-                id: UnitId::from_hash(&{
+                id: UnitId::from_hash({
                     use std::hash::{Hash, Hasher};
                     let mut h = std::collections::hash_map::DefaultHasher::new();
                     unit.id.hash(&mut h);
                     position.hash(&mut h);
-                    h.finish().to_le_bytes()
+                    h.finish()
                 }),
                 text: marked,
                 context_before: None,
@@ -232,7 +232,7 @@ pub enum RecombineError {
     #[error("Segments belong to different sections")]
     SectionMismatch,
     #[error("Placeholder validation failed: {0}")]
-    PlaceholderError(#[from] super::PlaceholderError),
+    PlaceholderError(#[from] unit::PlaceholderError),
 }
 
 /// Rolling summary para contexto em livros longos

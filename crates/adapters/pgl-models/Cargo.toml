@@ -6,8 +6,8 @@ description = "Catálogo de modelos, detecção de hardware, download e licença
 license = "MIT OR Apache-2.0"
 
 [dependencies]
-pgl-app = { path = "../../../app/pgl-app" }
-pgl-domain = { path = "../../../domain/pgl-domain" }
+pgl-app = { workspace = true }
+pgl-domain = { workspace = true }
 reqwest = { workspace = true }
 async-trait = { workspace = true }
 thiserror = { workspace = true }
@@ -16,7 +16,6 @@ serde_json = { workspace = true }
 tokio = { workspace = true }
 sysinfo = "0.30"
 tracing = { workspace = true }
-std::path::PathBuf
 
 [dev-dependencies]
 insta = { workspace = true }

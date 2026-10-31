@@ -6,11 +6,11 @@ description = "Adaptador EPUB (leitura e escrita via patch engine)"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
-pgl-fmt-core = { path = "../pgl-fmt-core" }
-pgl-fmt-patch = { path = "../pgl-fmt-patch" }
-pgl-app = { path = "../../../app/pgl-app" }
-pgl-domain = { path = "../../../domain/pgl-domain" }
-epub = "0.4"
+pgl-fmt-core = { workspace = true }
+pgl-fmt-patch = { workspace = true }
+pgl-app = { workspace = true }
+pgl-domain = { workspace = true }
+epub = "2"
 zip = { workspace = true }
 quick-xml = { workspace = true }
 thiserror = { workspace = true }
@@ -20,7 +20,6 @@ serde = { workspace = true }
 [dev-dependencies]
 insta = { workspace = true }
 tempfile = { workspace = true }
-epub-check = "0.2"
 
 [lib]
 name = "pgl_fmt_epub"

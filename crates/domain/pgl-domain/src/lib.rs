@@ -36,8 +36,15 @@ impl UnitId {
         Self(Uuid::now_v7())
     }
 
-    /// Cria um ID determinístico a partir de um hash
-    pub fn from_hash(hash: &[u8; 16]) -> Self {
+    /// Cria um ID determinístico a partir de um hash u64
+    pub fn from_hash(hash: u64) -> Self {
+        let mut bytes = [0u8; 16];
+        bytes[..8].copy_from_slice(&hash.to_le_bytes());
+        Self(Uuid::from_bytes(bytes))
+    }
+
+    /// Cria um ID determinístico a partir de um hash de 16 bytes
+    pub fn from_hash_bytes(hash: &[u8; 16]) -> Self {
         Self(Uuid::from_bytes(*hash))
     }
 }
@@ -55,7 +62,7 @@ impl fmt::Display for UnitId {
 }
 
 /// Identificador de seção/capítulo
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Ord, PartialOrd)]
 pub struct SectionId(pub Uuid);
 
 impl SectionId {
@@ -401,7 +408,7 @@ pub use glossary::Glossary;
 pub use job::{Job, JobConfig, JobProgress, JobState};
 pub use marked_text::MarkedText;
 pub use project::Project;
-pub use qa::{QaCheck, QaResult};
+pub use qa::{QaChecker as QaCheck, QaResult};
 pub use segmentation::{Segment, SegmentationRule};
 pub use style_guide::StyleGuide;
 pub use unit::Unit;

@@ -10,12 +10,14 @@ keywords = ["translation", "books", "documents", "domain"]
 
 [dependencies]
 serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
 serde_with = { workspace = true }
 thiserror = { workspace = true }
 uuid = { workspace = true, features = ["v4", "v7", "serde", "fast-rng"] }
 chrono = { workspace = true, features = ["serde"] }
 hex = { workspace = true }
-proptest = { workspace = true, optional = true }
+csv = { workspace = true }
+regex = { workspace = true }
 
 [dev-dependencies]
 proptest = { workspace = true }
@@ -23,12 +25,8 @@ insta = { workspace = true, features = ["json", "serde"] }
 
 [features]
 default = []
-proptest = ["proptest"]
+proptest = []
 
 [lib]
 name = "pgl_domain"
 path = "src/lib.rs"
-
-[[bench]]
-name = "domain_bench"
-harness = false

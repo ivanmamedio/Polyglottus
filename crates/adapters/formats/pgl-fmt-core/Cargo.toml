@@ -6,8 +6,8 @@ description = "Utilitários comuns para adaptadores de formato: ZIP seguro, XML,
 license = "MIT OR Apache-2.0"
 
 [dependencies]
-pgl-domain = { path = "../../../domain/pgl-domain" }
-pgl-app = { path = "../../../app/pgl-app" }
+pgl-domain = { workspace = true }
+pgl-app = { workspace = true }
 zip = { workspace = true }
 quick-xml = { workspace = true }
 html5ever = { workspace = true }

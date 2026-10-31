@@ -6,9 +6,9 @@ description = "Motor de 'patch no lugar' para formatos baseados em ZIP+XML (OPC/
 license = "MIT OR Apache-2.0"
 
 [dependencies]
-pgl-fmt-core = { path = "../pgl-fmt-core" }
-pgl-app = { path = "../../../app/pgl-app" }
-pgl-domain = { path = "../../../domain/pgl-domain" }
+pgl-fmt-core = { workspace = true }
+pgl-app = { workspace = true }
+pgl-domain = { workspace = true }
 zip = { workspace = true }
 quick-xml = { workspace = true }
 thiserror = { workspace = true }

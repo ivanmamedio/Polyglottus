@@ -6,15 +6,14 @@ description = "Provedor embutido via llama.cpp (pgl-engine)"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
-pgl-app = { path = "../../../app/pgl-app" }
-pgl-domain = { path = "../../../domain/pgl-domain" }
-llama-cpp-2 = { workspace = true, features = ["standard", "metal", "cuda"] }
+pgl-app = { workspace = true }
+pgl-domain = { workspace = true }
+llama-cpp-2 = { workspace = true, features = ["cuda"] }
 async-trait = { workspace = true }
 thiserror = { workspace = true }
 serde = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
-std::path::PathBuf
 
 [dev-dependencies]
 insta = { workspace = true }

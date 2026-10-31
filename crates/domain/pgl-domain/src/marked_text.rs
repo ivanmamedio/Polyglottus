@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// Texto marcado com placeholders para proteção de marcação inline
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MarkedText {
     /// Texto com placeholders (ex: "Ele disse ⟦1⟧não⟦/1⟧ e saiu.")
     pub raw: String,
@@ -20,6 +20,20 @@ pub struct MarkedText {
     /// Texto original sem placeholders (para referência/diff)
     #[serde(skip)]
     pub original: Option<String>,
+}
+
+impl std::hash::Hash for MarkedText {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.raw.hash(state);
+        // Hash the placeholders in a deterministic order
+        let mut keys: Vec<_> = self.placeholders.keys().collect();
+        keys.sort();
+        for key in keys {
+            key.hash(state);
+            self.placeholders[key].hash(state);
+        }
+        self.original.hash(state);
+    }
 }
 
 impl MarkedText {

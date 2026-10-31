@@ -7,16 +7,20 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/polyglottus/polyglottus"
 
 [dependencies]
-pgl-domain = { path = "../../domain/pgl-domain" }
-async-trait = "0.1"
+pgl-domain = { workspace = true }
+async-trait = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 serde = { workspace = true }
+serde_json = { workspace = true }
 uuid = { workspace = true }
+anyhow = { workspace = true }
+reqwest = { workspace = true }
+rusqlite = { workspace = true }
+sqlx = { workspace = true }
 
 [dev-dependencies]
-pgl-testkit = { path = "../../testing/pgl-testkit" }
 tokio = { workspace = true, features = ["test-util"] }
 
 [lib]

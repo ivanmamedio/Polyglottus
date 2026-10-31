@@ -10,22 +10,22 @@ name = "pgl-cli"
 path = "src/main.rs"
 
 [dependencies]
-pgl-app = { path = "../../../app/pgl-app" }
-pgl-domain = { path = "../../../domain/pgl-domain" }
-pgl-fmt-epub = { path = "../../../adapters/formats/pgl-fmt-epub" }
-pgl-fmt-ooxml = { path = "../../../adapters/formats/pgl-fmt-ooxml" }
-pgl-fmt-odf = { path = "../../../adapters/formats/pgl-fmt-odf" }
-pgl-fmt-text = { path = "../../../adapters/formats/pgl-fmt-text" }
-pgl-fmt-pdf = { path = "../../../adapters/formats/pgl-fmt-pdf" }
-pgl-fmt-convert = { path = "../../../adapters/formats/pgl-fmt-convert" }
-pgl-provider-openai = { path = "../../../adapters/providers/pgl-provider-openai" }
-pgl-provider-ollama = { path = "../../../adapters/providers/pgl-provider-ollama" }
-pgl-provider-embedded = { path = "../../../adapters/providers/pgl-provider-embedded" }
-pgl-ocr = { path = "../../../adapters/pgl-ocr" }
-pgl-storage = { path = "../../../adapters/pgl-storage" }
-pgl-secrets = { path = "../../../adapters/pgl-secrets" }
-pgl-models = { path = "../../../adapters/pgl-models" }
-pgl-testkit = { path = "../../../testing/pgl-testkit" }
+pgl-app = { workspace = true }
+pgl-domain = { workspace = true }
+pgl-fmt-epub = { workspace = true }
+pgl-fmt-ooxml = { workspace = true }
+pgl-fmt-odf = { workspace = true }
+pgl-fmt-text = { workspace = true }
+pgl-fmt-pdf = { workspace = true }
+pgl-fmt-convert = { workspace = true }
+pgl-provider-openai = { workspace = true }
+pgl-provider-ollama = { workspace = true }
+pgl-provider-embedded = { workspace = true }
+pgl-ocr = { workspace = true }
+pgl-storage = { workspace = true }
+pgl-secrets = { workspace = true }
+pgl-models = { workspace = true }
+pgl-testkit = { workspace = true }
 clap = { workspace = true, features = ["derive", "env"] }
 tokio = { workspace = true, features = ["full"] }
 tracing = { workspace = true }
@@ -33,7 +33,6 @@ tracing-subscriber = { workspace = true }
 anyhow = { workspace = true }
 indicatif = { workspace = true }
 uuid = { workspace = true }
-std::path::PathBuf
 
 [dev-dependencies]
 tempfile = { workspace = true }

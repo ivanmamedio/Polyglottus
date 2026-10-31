@@ -34,6 +34,30 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde_with = "3.5"
+async-trait = "0.1"
+
+# Internal crates
+pgl-domain = { path = "crates/domain/pgl-domain" }
+pgl-app = { path = "crates/app/pgl-app" }
+pgl-fmt-core = { path = "crates/adapters/formats/pgl-fmt-core" }
+pgl-fmt-patch = { path = "crates/adapters/formats/pgl-fmt-patch" }
+pgl-fmt-epub = { path = "crates/adapters/formats/pgl-fmt-epub" }
+pgl-fmt-ooxml = { path = "crates/adapters/formats/pgl-fmt-ooxml" }
+pgl-fmt-odf = { path = "crates/adapters/formats/pgl-fmt-odf" }
+pgl-fmt-text = { path = "crates/adapters/formats/pgl-fmt-text" }
+pgl-fmt-pdf = { path = "crates/adapters/formats/pgl-fmt-pdf" }
+pgl-fmt-convert = { path = "crates/adapters/formats/pgl-fmt-convert" }
+pgl-provider-openai = { path = "crates/adapters/providers/pgl-provider-openai" }
+pgl-provider-ollama = { path = "crates/adapters/providers/pgl-provider-ollama" }
+pgl-provider-embedded = { path = "crates/adapters/providers/pgl-provider-embedded" }
+pgl-ocr = { path = "crates/adapters/pgl-ocr" }
+pgl-storage = { path = "crates/adapters/pgl-storage" }
+pgl-secrets = { path = "crates/adapters/pgl-secrets" }
+pgl-models = { path = "crates/adapters/pgl-models" }
+pgl-cli = { path = "crates/bins/pgl-cli" }
+pgl-engine = { path = "crates/bins/pgl-engine" }
+pgl-testkit = { path = "crates/testing/pgl-testkit" }
+polyglottus-desktop = { path = "apps/desktop/src-tauri" }
 
 # Config
 config = { version = "0.14", features = ["toml", "env"] }
@@ -44,29 +68,29 @@ clap = { version = "4.5", features = ["derive", "env"] }
 indicatif = "0.17"
 
 # Storage
-rusqlite = { version = "0.31", features = ["bundled", "modern_sqlite", "serde_json", "functions", "vtab", "blob"] }
-sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "sqlite", "chrono", "uuid", "migrate"] }
+rusqlite = { version = "0.31", features = ["modern_sqlite", "serde_json", "functions", "vtab", "blob"] }
+sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "sqlite", "chrono", "uuid", "migrate", "tls-rustls"] }
 
 # Crypto/Secrets
-keyring = "1.3"
+keyring = { version = "4.2", features = [] }
 zeroize = "1.7"
 
 # Formats
 zip = "0.6"
-quick-xml = { version = "0.31", features = ["serialize", "namespaces"] }
+quick-xml = { version = "0.31", features = ["serialize"] }
 html5ever = "0.26"
 scraper = "0.19"
 lopdf = "0.31"
-pdfium-render = { version = "0.7", features = ["bind_to_system_library"] }
-docx-rs = { version = "0.5", features = ["full"] }
-odf = "0.4"
+pdfium-render = { version = "0.9", features = [] }
+docx-rs = { version = "0.4" }
+lo_odf = { version = "0.5", features = [] }
 
 # OCR
-ocrs = { version = "0.2", features = ["onnx"] }
-ort = { version = "1.16", features = ["load-model", "cuda"] }
+ocrs = { version = "0.13", features = ["onnx"] }
+ort = { version = "2.0.0-rc.15", features = ["cuda", "api-17"] }
 
 # Inference
-llama-cpp-2 = { version = "0.10", features = ["standard", "metal", "cuda"] }
+llama-cpp-2 = { version = "0.1.160", features = ["cuda"] }
 reqwest = { version = "0.12", features = ["json", "rustls-tls", "stream"] }
 
 # Testing
@@ -75,15 +99,17 @@ proptest = "1.4"
 criterion = { version = "0.5", features = ["html_reports"] }
 tempfile = "3.8"
 fake = "3.0"
+csv = "1.3"
+regex = "1.10"
 
 # Tauri
-tauri = { version = "2.0", features = ["cli"] }
-tauri-plugin-dialog = "2.0"
-tauri-plugin-fs = "2.0"
-tauri-plugin-shell = "2.0"
-tauri-plugin-opener = "2.0"
-tauri-plugin-store = "2.0"
-tauri-plugin-sql = "2.0"
+tauri = { version = "2" }
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
+tauri-plugin-shell = "2"
+tauri-plugin-opener = "2"
+tauri-plugin-store = "2"
+tauri-plugin-sql = "2"
 
 # Utils
 uuid = { version = "1.7", features = ["v4", "v7", "serde", "fast-rng"] }
