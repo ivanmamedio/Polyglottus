@@ -1,0 +1,23 @@
+[package]
+name = "pgl-testkit"
+version = "0.1.0"
+edition = "2021"
+description = "Test kit: FakeProvider determinístico, fixtures, helpers"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+pgl-app = { path = "../../../app/pgl-app" }
+pgl-domain = { path = "../../../domain/pgl-domain" }
+async-trait = { workspace = true }
+serde = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true }
+anyhow = { workspace = thiserror = { workspace = true }
+
+[dev-dependencies]
+insta = { workspace = true }
+proptest = { workspace = true }
+
+[lib]
+name = "pgl_testkit"

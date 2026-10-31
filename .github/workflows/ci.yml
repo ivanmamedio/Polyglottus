@@ -1,0 +1,166 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-D warnings"
+  RUST_BACKTRACE: 1
+
+jobs:
+  lint:
+    name: Lint (fmt + clippy)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+      - name: Check formatting
+        run: cargo fmt --all --check
+      - name: Run clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+  test:
+    name: Test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+      - name: Install system dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libssl-dev libappindicator3-dev librsvg2-dev patchelf
+      - name: Run tests
+        run: cargo nextest run --workspace
+
+  deny:
+    name: Cargo Deny (licenses, bans, sources)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install cargo-deny
+        uses: baptiste0928/cargo-install@v3
+        with:
+          crate: cargo-deny
+      - name: Cache cargo-deny
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/deny
+          key: deny-${{ runner.os }}-${{ hashFiles('deny.toml') }}
+      - name: Run cargo-deny
+        run: cargo deny check
+
+  audit:
+    name: Cargo Audit (security)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install cargo-audit
+        uses: baptiste0928/cargo-install@v3
+        with:
+          crate: cargo-audit
+      - name: Run cargo-audit
+        run: cargo audit
+
+  docs:
+    name: Documentation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+      - name: Generate docs
+        run: cargo doc --workspace --no-deps --document-private-items
+      - name: Check broken links
+        run: |
+          cargo install cargo-deadlinks
+          cargo deadlinks --dir target/doc
+
+  corpus:
+    name: Corpus Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+      - name: Run corpus tests with FakeProvider
+        run: cargo test --workspace --test corpus --features testkit
+
+  package-flatpak:
+    name: Package Flatpak
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Flatpak tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flatpak-builder
+          flatpak install -y flathub org.freedesktop.Sdk//23.08 org.freedesktop.Platform//23.08
+      - name: Build Flatpak
+        run: |
+          cd packaging/flatpak
+          flatpak-builder --force-clean build-dir org.polyglottus.Polyglottus.yml
+      - name: Upload Flatpak artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: polyglottus-flatpak
+          path: packaging/flatpak/build-dir/*.flatpak
+
+  package-windows:
+    name: Package Windows
+    runs-on: windows-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli --version 2
+      - name: Build Windows
+        run: |
+          cd apps/desktop
+          cargo tauri build --target x86_64-pc-windows-msvc
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: polyglottus-windows
+          path: apps/desktop/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi
+
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    needs: [lint, test, deny, audit, docs, corpus]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          generate_release_notes: true
+          files: |
+            packaging/flatpak/build-dir/*.flatpak
+            apps/desktop/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi

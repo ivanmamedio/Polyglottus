@@ -1,0 +1,24 @@
+[package]
+name = "pgl-fmt-pdf"
+version = "0.1.0"
+edition = "2021"
+description = "Adaptador PDF (reflow, overlay, OCR)"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+pgl-fmt-core = { path = "../pgl-fmt-core" }
+pgl-app = { path = "../../../app/pgl-app" }
+pgl-domain = { path = "../../../domain/pgl-domain" }
+pdfium-render = { workspace = true, features = ["bind_to_system_library"] }
+lopdf = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+serde = { workspace = true }
+image = "0.24"
+
+[dev-dependencies]
+insta = { workspace = true }
+tempfile = { workspace = true }
+
+[lib]
+name = "pgl_fmt_pdf"

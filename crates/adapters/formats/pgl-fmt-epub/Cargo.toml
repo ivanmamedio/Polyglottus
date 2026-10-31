@@ -1,0 +1,26 @@
+[package]
+name = "pgl-fmt-epub"
+version = "0.1.0"
+edition = "2021"
+description = "Adaptador EPUB (leitura e escrita via patch engine)"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+pgl-fmt-core = { path = "../pgl-fmt-core" }
+pgl-fmt-patch = { path = "../pgl-fmt-patch" }
+pgl-app = { path = "../../../app/pgl-app" }
+pgl-domain = { path = "../../../domain/pgl-domain" }
+epub = "0.4"
+zip = { workspace = true }
+quick-xml = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+serde = { workspace = true }
+
+[dev-dependencies]
+insta = { workspace = true }
+tempfile = { workspace = true }
+epub-check = "0.2"
+
+[lib]
+name = "pgl_fmt_epub"

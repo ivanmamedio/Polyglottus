@@ -1,0 +1,26 @@
+[package]
+name = "pgl-fmt-text"
+version = "0.1.0"
+edition = "2021"
+description = "Adaptador para formatos de texto simples: TXT, Markdown, SRT, VTT, HTML, legendas, PO, XLIFF, TMX"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+pgl-fmt-core = { path = "../pgl-fmt-core" }
+pgl-app = { path = "../../../app/pgl-app" }
+pgl-domain = { path = "../../../domain/pgl-domain" }
+html5ever = { workspace = true }
+scraper = { workspace = true }
+quick-xml = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+serde = { workspace = true }
+pulldown-cmark = "0.10"
+comrak = { version = "0.20", features = ["default"] }
+
+[dev-dependencies]
+insta = { workspace = true }
+tempfile = { workspace = true }
+
+[lib]
+name = "pgl_fmt_text"

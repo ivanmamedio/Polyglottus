@@ -1,0 +1,69 @@
+[licenses]
+# Allowlist of license identifiers (SPDX)
+# All dependencies must have a license in this list
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-DFS-2016",
+    "Zlib",
+    "CC0-1.0",
+    "MPL-2.0",
+    "BSD-3-Clause-Attribution",
+]
+
+# Denylist of license identifiers
+deny = [
+    "GPL-2.0",
+    "GPL-3.0",
+    "AGPL-3.0",
+    "LGPL-2.0",
+    "LGPL-2.1",
+    "LGPL-3.0",
+    "SSPL-1.0",
+    "Commons-Clause",
+]
+
+# Allow specific crates with non-allowlisted licenses
+# Format: "crate-name" = "license-expression"
+# Example: "pandoc" = "GPL-2.0-or-later"
+exceptions = {}
+
+[advisories]
+# Vulnerability database to use
+db = "rustsec"
+# Path to local advisory database (optional)
+# db-path = "path/to/advisory-db"
+
+# Ignore specific vulnerabilities (use sparingly!)
+# Format: "RUSTSEC-YYYY-NNNN" = "reason"
+ignore = {}
+
+[bans]
+# Crates that are banned from the dependency tree
+# Format: "crate-name" = "reason"
+deny = {
+    "openssl" = "Use rustls instead",
+    "native-tls" = "Use rustls instead",
+    "reqwest-native-tls" = "Use rustls-tls feature instead",
+}
+
+# Allow specific versions of banned crates (for transitive deps)
+# skip = ["crate-name@version"]
+
+# Deny multiple versions of the same crate
+multiple-versions = "warn"
+
+# Deny crates that are yanked
+yanked = "deny"
+
+[sources]
+# Only allow crates.io and the local registry
+allow = ["crates-io", "local-registry"]
+
+[unofficial]
+# Warn about crates that are not on crates.io
+warn = true

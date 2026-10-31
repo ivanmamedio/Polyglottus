@@ -1,0 +1,20 @@
+[package]
+name = "pgl-secrets"
+version = "0.1.0"
+edition = "2021"
+description = "Adaptador de segredos (cofre do sistema via keyring)"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+pgl-app = { path = "../../../app/pgl-app" }
+keyring = { workspace = true }
+async-trait = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+insta = { workspace = true }
+
+[lib]
+name = "pgl_secrets"

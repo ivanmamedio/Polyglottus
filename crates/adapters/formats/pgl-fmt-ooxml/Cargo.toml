@@ -1,0 +1,25 @@
+[package]
+name = "pgl-fmt-ooxml"
+version = "0.1.0"
+edition = "2021"
+description = "Adaptador OOXML (DOCX, PPTX, XLSX) via patch engine"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+pgl-fmt-core = { path = "../pgl-fmt-core" }
+pgl-fmt-patch = { path = "../pgl-fmt-patch" }
+pgl-app = { path = "../../../app/pgl-app" }
+pgl-domain = { path = "../../../domain/pgl-domain" }
+docx-rs = { workspace = true, features = ["full"] }
+zip = { workspace = true }
+quick-xml = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+serde = { workspace = true }
+
+[dev-dependencies]
+insta = { workspace = true }
+tempfile = { workspace = true }
+
+[lib]
+name = "pgl_fmt_ooxml"

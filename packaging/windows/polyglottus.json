@@ -1,0 +1,32 @@
+{
+  "version": "0.1.0",
+  "description": "Polyglottus - Tradutor de livros e documentos",
+  "homepage": "https://github.com/polyglottus/polyglottus",
+  "license": "MIT OR Apache-2.0",
+  "architecture": {
+    "64bit": {
+      "url": "https://github.com/polyglottus/polyglottus/releases/download/v0.1.0/polyglottus-x64.msi",
+      "hash": "sha256:TODO"
+    }
+  },
+  "installer": {
+    "script": [
+      "Write-Host 'Instalando Polyglottus...'",
+      "Start-Process msiexec.exe -ArgumentList '/i', \"$dir\\polyglottus-x64.msi\", '/quiet', '/norestart' -Wait"
+    ]
+  },
+  "uninstaller": {
+    "script": [
+      "Write-Host 'Removendo Polyglottus...'",
+      "Start-Process msiexec.exe -ArgumentList '/x', \"$dir\\polyglottus-x64.msi\", '/quiet', '/norestart' -Wait"
+    ]
+  },
+  "checkver": "github",
+  "autoupdate": {
+    "architecture": {
+      "64bit": {
+        "url": "https://github.com/polyglottus/polyglottus/releases/download/v$version/polyglottus-x64.msi"
+      }
+    }
+  }
+}

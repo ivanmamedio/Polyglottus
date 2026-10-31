@@ -1,0 +1,19 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Polyglottus
+GenericName=Book & Document Translator
+Comment=Tradutor de livros e documentos local-first
+Comment[pt_BR]=Tradutor de livros e documentos local-first
+Comment[en]=Local-first book and document translator
+Comment[es]=Traductor local-first de libros y documentos
+Exec=polyglottus
+Icon=org.polyglottus.Polyglottus
+Terminal=false
+Categories=Office;Translation;Utility;
+Keywords=translate;translation;book;document;epub;pdf;docx;local;offline;
+Keywords[pt_BR]=traduzir;tradução;livro;documento;epub;pdf;docx;local;offline;
+Keywords[en]=translate;translation;book;document;epub;pdf;docx;local;offline;
+StartupNotify=true
+StartupWMClass=polyglottus
+MimeType=application/epub+zip;application/pdf;application/vnd.openxmlformats-officedocument.wordprocessingml.document;application/vnd.openxmlformats-officedocument.presentationml.presentation;application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;application/vnd.oasis.opendocument.text;application/vnd.oasis.opendocument.presentation;application/vnd.oasis.opendocument.spreadsheet;text/plain;text/markdown;text/html;application/x-fictionbook+xml;application/x-subrip;text/vtt;application/x-xliff;application/tmx;application/json;

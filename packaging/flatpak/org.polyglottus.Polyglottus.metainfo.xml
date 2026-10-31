@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>org.polyglottus.Polyglottus</id>
+  <name>Polyglottus</name>
+  <summary>Tradutor de livros e documentos local-first</summary>
+  <description>
+    <p>O <b>Polyglottus</b> traduz livros e documentos inteiros, no maior número possível de formatos (EPUB, PDF, DOCX e muitos outros), preservando estrutura, imagens e o máximo possível do layout.</p>
+    <p>Roda localmente, é leve, e usa modelos locais como caminho principal. API de terceiros é opcional e usa a chave do próprio usuário.</p>
+    <p><b>Princípios:</b></p>
+    <ul>
+      <li>Gratuito e open source, sem taxa, sem conta, sem telemetria obrigatória</li>
+      <li>Local-first: o livro nunca sai da sua máquina, a menos que você escolha uma API externa</li>
+      <li>Rust-first: núcleo em Rust, binários nativos isolados atrás de interfaces</li>
+      <li>Leve: instalador pequeno, pouca RAM, abertura rápida, sem Python e sem Electron no núcleo</li>
+      <li>Honesto sobre fidelidade: cada formato tem um nível de fidelidade declarado e visível</li>
+    </ul>
+  </description>
+  <project_license>MIT OR Apache-2.0</project_license>
+  <developer_name>Polyglottus Contributors</developer_name>
+  <url type="homepage">https://github.com/polyglottus/polyglottus</url>
+  <url type="bugtracker">https://github.com/polyglottus/polyglottus/issues</url>
+  <url type="help">https://github.com/polyglottus/polyglottus/discussions</url>
+  <url type="donation">https://github.com/sponsors/polyglottus</url>
+  <screenshots>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/polyglottus/polyglottus/main/docs/screenshots/main.png</image>
+      <caption>Tela principal com lista de projetos</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/polyglottus/polyglottus/main/docs/screenshots/translate.png</image>
+      <caption>Configuração de tradução</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/polyglottus/polyglottus/main/docs/screenshots/review.png</image>
+      <caption>Revisão lado a lado</caption>
+    </screenshot>
+  </screenshots>
+  <releases>
+    <release version="0.1.0" date="2026-10-30">
+      <description>
+        <p>Versão inicial de desenvolvimento.</p>
+      </description>
+    </release>
+  </releases>
+  <provides>
+    <binary>polyglottus</binary>
+  </provides>
+  <categories>
+    <category>Office</category>
+    <category>Translation</category>
+    <category>Utility</category>
+  </categories>
+  <keywords>
+    <keyword>translate</keyword>
+    <keyword>translation</keyword>
+    <keyword>book</keyword>
+    <keyword>document</keyword>
+    <keyword>epub</keyword>
+    <keyword>pdf</keyword>
+    <keyword>docx</keyword>
+    <keyword>local</keyword>
+    <keyword>offline</keyword>
+  </keywords>
+  <content_rating type="oars-1.1">
+    <content_attribute id="violence-cartoon">none</content_attribute>
+    <content_attribute id="violence-fantasy">none</content_attribute>
+    <content_attribute id="violence-realistic">none</content_attribute>
+    <content_attribute id="violence-bloodshed">none</content_attribute>
+    <content_attribute id="violence-sexual">none</content_attribute>
+    <content_attribute id="drugs-alcohol">none</content_attribute>
+    <content_attribute id="drugs-narcotics">none</content_attribute>
+    <content_attribute id="drugs-tobacco">none</content_attribute>
+    <content_attribute id="sex-nudity">none</content_attribute>
+    <content_attribute id="sex-themes">none</content_attribute>
+    <content_attribute id="sex-homosexuality">none</content_attribute>
+    <content_attribute id="profanity">none</content_attribute>
+    <content_attribute id="gambling">none</content_attribute>
+  </content_rating>
+  <custom>
+    <value key="flathub::git-url">https://github.com/polyglottus/polyglottus</value>
+    <value key="flathub::branch">main</value>
+  </custom>
+</component>

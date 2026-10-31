@@ -1,0 +1,24 @@
+[package]
+name = "pgl-provider-ollama"
+version = "0.1.0"
+edition = "2021"
+description = "Provedor Ollama (API nativa)"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+pgl-app = { path = "../../../app/pgl-app" }
+pgl-domain = { path = "../../../domain/pgl-domain" }
+reqwest = { workspace = true }
+async-trait = { workspace = true }
+thiserror = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+insta = { workspace = true }
+mockito = "1.2"
+
+[lib]
+name = "pgl_provider_ollama"

@@ -1,0 +1,51 @@
+app-id: org.polyglottus.Polyglottus
+runtime: org.freedesktop.Platform
+runtime-version: '23.08'
+sdk: org.freedesktop.Sdk
+command: polyglottus
+finish-args:
+  - --share=ipc
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --device=dri
+  - --filesystem=home
+  - --talk-name=org.freedesktop.portals.Desktop
+  - --talk-name=org.freedesktop.portals.Folder
+  - --talk-name=org.freedesktop.portals.FileTransfer
+  - --env=WEBKIT_DISABLE_DMABUF_RENDERER=1
+  - --env=WEBKIT_DISABLE_COMPOSITING_MODE=1
+  - --env=TAURI_WEBVIEW_DISABLE_WEBGL=1
+  - --own-name=org.polyglottus.Polyglottus
+cleanup:
+  - /include
+  - /lib/pkgconfig
+  - /man
+  - /share/doc
+  - /share/gtk-doc
+  - /share/man
+  - /share/pkgconfig
+  - /lib/lib*.la
+  - /lib/*.a
+  - /lib/cmake
+  - '*.la'
+  - '*.a'
+modules:
+  - name: polyglottus
+    buildsystem: simple
+    build-commands:
+      - install -Dm755 polyglottus /app/bin/polyglottus
+      - install -Dm644 org.polyglottus.Polyglottus.desktop /app/share/applications/org.polyglottus.Polyglottus.desktop
+      - install -Dm644 org.polyglottus.Polyglottus.metainfo.xml /app/share/metainfo/org.polyglottus.Polyglottus.metainfo.xml
+      - install -Dm644 icons/128x128.png /app/share/icons/hicolor/128x128/apps/org.polyglottus.Polyglottus.png
+      - for size in 16 32 48 64 128 256; do
+          install -Dm644 icons/${size}x${size}.png /app/share/icons/hicolor/${size}x${size}/apps/org.polyglottus.Polyglottus.png;
+        done
+    sources:
+      - type: file
+        path: polyglottus
+      - type: file
+        path: org.polyglottus.Polyglottus.desktop
+      - type: file
+        path: org.polyglottus.Polyglottus.metainfo.xml
+      - type: file
+        path: icons

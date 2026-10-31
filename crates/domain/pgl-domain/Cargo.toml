@@ -1,0 +1,34 @@
+[package]
+name = "pgl-domain"
+version = "0.1.0"
+edition = "2021"
+description = "Domínio puro do Polyglottus: unidades, texto marcado, glossário, guia de estilo, estado de job, regras de QA/segmentação/placeholders (sem I/O, sem async)"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/polyglottus/polyglottus"
+categories = ["text-processing", "localization"]
+keywords = ["translation", "books", "documents", "domain"]
+
+[dependencies]
+serde = { workspace = true, features = ["derive"] }
+serde_with = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true, features = ["v4", "v7", "serde", "fast-rng"] }
+chrono = { workspace = true, features = ["serde"] }
+hex = { workspace = true }
+proptest = { workspace = true, optional = true }
+
+[dev-dependencies]
+proptest = { workspace = true }
+insta = { workspace = true, features = ["json", "serde"] }
+
+[features]
+default = []
+proptest = ["proptest"]
+
+[lib]
+name = "pgl_domain"
+path = "src/lib.rs"
+
+[[bench]]
+name = "domain_bench"
+harness = false

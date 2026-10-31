@@ -1,0 +1,23 @@
+[package]
+name = "pgl-fmt-convert"
+version = "0.1.0"
+edition = "2021"
+description = "Adaptador para formatos de cauda longa via conversores externos (Pandoc, Calibre, LibreOffice)"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+pgl-fmt-core = { path = "../pgl-fmt-core" }
+pgl-app = { path = "../../../app/pgl-app" }
+pgl-domain = { path = "../../../domain/pgl-domain" }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+serde = { workspace = true }
+tokio = { workspace = true }
+which = "5.0"
+
+[dev-dependencies]
+insta = { workspace = true }
+tempfile = { workspace = true }
+
+[lib]
+name = "pgl_fmt_convert"

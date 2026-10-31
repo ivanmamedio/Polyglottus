@@ -1,0 +1,23 @@
+[package]
+name = "pgl-app"
+version = "0.1.0"
+edition = "2021"
+description = "Casos de uso do Polyglottus + PORTAS (traits) para adaptadores"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/polyglottus/polyglottus"
+
+[dependencies]
+pgl-domain = { path = "../../domain/pgl-domain" }
+async-trait = "0.1"
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+serde = { workspace = true }
+uuid = { workspace = true }
+
+[dev-dependencies]
+pgl-testkit = { path = "../../testing/pgl-testkit" }
+tokio = { workspace = true, features = ["test-util"] }
+
+[lib]
+name = "pgl_app"

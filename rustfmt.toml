@@ -1,0 +1,16 @@
+edition = "2021"
+max_width = 100
+tab_spaces = 4
+hard_tabs = false
+newline_style = "Unix"
+use_small_heuristics = "Max"
+fn_params_layout = "Tall"
+brace_style = "SameLineWhere"
+control_brace_style = "SameLineWhere"
+reorder_imports = true
+group_imports = "StdExternalCrate"
+imports_granularity = "Crate"
+normalize_doc_attributes = true
+format_strings = true
+format_macro_matchers = true
+format_macro_bodies = true

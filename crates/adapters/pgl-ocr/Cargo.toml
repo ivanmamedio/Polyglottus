@@ -1,0 +1,30 @@
+[package]
+name = "pgl-ocr"
+version = "0.1.0"
+edition = "2021"
+description = "Adaptador OCR (ocrs padrão + Tesseract/ONNX opcional)"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+pgl-app = { path = "../../../app/pgl-app" }
+pgl-domain = { path = "../../../domain/pgl-domain" }
+ocrs = { workspace = true, features = ["onnx"] }
+ort = { workspace = true, features = ["load-model", "cuda"] }
+tesseract = { version = "0.3", optional = true }
+image = "0.24"
+async-trait = { workspace = true }
+thiserror = { workspace = true }
+serde = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+
+[features]
+default = ["ocrs"]
+tesseract = ["tesseract"]
+onnx = ["ort"]
+
+[dev-dependencies]
+insta = { workspace = true }
+
+[lib]
+name = "pgl_ocr"
