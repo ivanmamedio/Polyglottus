@@ -61,6 +61,9 @@
   };
 
   let unsubscribeEvents: () => void;
+  let filterState = 'all';
+
+  $: filteredUnits = units.filter(u => filterState === 'all' || u.state === filterState);
 
   async function loadJobs() {
     try {
@@ -178,6 +181,20 @@
     }
   }
 
+  async function editUnit(unit: UnitDto) {
+    // TODO: abrir modal de edição
+    alert('Editar: ' + unit.source_text.substring(0, 50));
+  }
+
+  async function retraduzeUnit(id: string) {
+    try {
+      await invoke('update_unit', { unitId: id, translation: '', action: 'retranslate' });
+      await loadUnits();
+    } catch (e) {
+      alert('Erro: ' + e);
+    }
+  }
+
   onMount(async () => {
     await loadJobs();
 
@@ -245,7 +262,7 @@
           <div class="p-4 hover:bg-surface-50 dark:hover:bg-surface-800/50 transition-colors" class:selected={selectedJob?.id === job.id} onclick={() => { selectedJob = job; loadUnits(); }}>
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-4">
-                <span class="px-3 py-1 rounded-full text-sm font-medium" class={getStateColor(job.state)}>{job.state}</span>
+                <span class="px-3 py-1 rounded-full text-sm font-medium {getStateColor(job.state)}">{job.state}</span>
                 <div>
                   <p class="font-medium text-surface-900 dark:text-surface-100">Para {job.target_language}</p>
                   <p class="text-sm text-surface-500 dark:text-surface-400">Criado em {new Date(job.created_at).toLocaleDateString('pt-BR')}</p>
@@ -352,23 +369,3 @@
     {/if}
   {/if}
 </div>
-
-<script lang="ts">
-  let filterState = 'all';
-
-  $: filteredUnits = units.filter(u => filterState === 'all' || u.state === filterState);
-
-  async function editUnit(unit: UnitDto) {
-    // TODO: abrir modal de edição
-    alert('Editar: ' + unit.source_text.substring(0, 50));
-  }
-
-  async function retraduzeUnit(id: string) {
-    try {
-      await invoke('update_unit', { unitId: id, translation: '', action: 'retranslate' });
-      await loadUnits();
-    } catch (e) {
-      alert('Erro: ' + e);
-    }
-  }
-</script>

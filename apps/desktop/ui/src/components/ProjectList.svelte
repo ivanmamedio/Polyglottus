@@ -57,6 +57,16 @@
     };
     return icons[format.toLowerCase()] || '📄';
   }
+
+  async function deleteProject(id: string) {
+    if (!confirm('Tem certeza que deseja excluir este projeto?')) return;
+    try {
+      await invoke('delete_project', { id });
+      await loadProjects();
+    } catch (e) {
+      alert('Erro ao excluir: ' + e);
+    }
+  }
 </script>
 
 <div class="space-y-6">
@@ -151,15 +161,3 @@
     </div>
   {/if}
 </div>
-
-<script lang="ts">
-  async function deleteProject(id: string) {
-    if (!confirm('Tem certeza que deseja excluir este projeto?')) return;
-    try {
-      await invoke('delete_project', { id });
-      await loadProjects();
-    } catch (e) {
-      alert('Erro ao excluir: ' + e);
-    }
-  }
-</script>

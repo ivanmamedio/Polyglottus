@@ -3,9 +3,10 @@ import { svelte } from '@sveltejs/vite-plugin-svelte';
 import path from 'path';
 import tailwindcss from 'tailwindcss';
 import autoprefixer from 'autoprefixer';
+import sveltePreprocess from 'svelte-preprocess';
 
 export default defineConfig({
-  plugins: [svelte()],
+  plugins: [svelte({ preprocess: sveltePreprocess() })],
   resolve: {
     alias: {
       $lib: path.resolve('./src/lib'),
