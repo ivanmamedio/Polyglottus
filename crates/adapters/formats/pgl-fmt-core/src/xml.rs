@@ -12,20 +12,21 @@ pub struct SafeXmlParser {
     depth: usize,
     max_depth: usize,
     max_entity_expansion: usize,
+    buf: Vec<u8>,
+    buf2: Vec<u8>,
 }
 
 impl SafeXmlParser {
-    pub fn new(input: impl Read + 'static) -> Self {
-        let mut reader = Reader::from_reader(BufReader::new(Box::new(input)));
-        reader.config_mut().trim_text(true);
-        reader.config_mut().expand_empty_elements = true;
-
-        Self {
+    pub fn new(input: impl Read + 'static) -> Result<Self, FormatError> {
+        let reader: Reader<BufReader<Box<dyn Read>>> = Reader::from_reader(BufReader::new(Box::new(input)));
+        Ok(Self {
             reader,
             depth: 0,
             max_depth: 1000,
             max_entity_expansion: 10_000,
-        }
+            buf: Vec::new(),
+            buf2: Vec::new(),
+        })
     }
 
     pub fn with_limits(mut self, max_depth: usize, max_entity_expansion: usize) -> Self {
@@ -34,23 +35,24 @@ impl SafeXmlParser {
         self
     }
 
-    pub fn next(&mut self) -> Result<Event<'_>, FormatError> {
-        let mut buf = Vec::new();
-        match self.reader.read_event_into(&mut buf) {
+    pub fn next(&mut self) -> Result<Event<'static>, FormatError> {
+        self.buf.clear();
+        match self.reader.read_event_into(&mut self.buf) {
             Ok(Event::Start(e)) => {
                 self.depth += 1;
                 if self.depth > self.max_depth {
                     return Err(FormatError::ParseError("XML depth limit exceeded".into()));
                 }
-                Ok(Event::Start(e))
+                Ok(Event::Start(e.into_owned()))
             }
             Ok(Event::End(_)) => {
                 self.depth = self.depth.saturating_sub(1);
-                let mut buf2 = Vec::new();
-                self.reader.read_event_into(&mut buf2)?;
-                Ok(Event::End(buf2.into()))
+                self.buf2.clear();
+                self.reader.read_event_into(&mut self.buf2)?;
+                let name = String::from_utf8_lossy(&self.buf2).into_owned();
+                Ok(Event::End(quick_xml::events::BytesEnd::new(name)))
             }
-            Ok(e) => Ok(e),
+            Ok(e) => Ok(e.into_owned()),
             Err(e) => Err(FormatError::ParseError(e.to_string())),
         }
     }
@@ -58,17 +60,16 @@ impl SafeXmlParser {
     /// Extrai texto de um elemento (concatena todo conteúdo de texto)
     pub fn extract_text(&mut self) -> Result<String, FormatError> {
         let mut text = String::new();
-        let mut buf = Vec::new();
 
         loop {
-            match self.reader.read_event_into(&mut buf) {
+            self.buf.clear();
+            match self.reader.read_event_into(&mut self.buf) {
                 Ok(Event::Text(e)) => text.push_str(&e.unescape()?),
                 Ok(Event::End(_)) => break,
                 Ok(Event::Eof) => break,
                 Ok(_) => {}
                 Err(e) => return Err(FormatError::ParseError(e.to_string())),
             }
-            buf.clear();
         }
 
         Ok(text)
@@ -155,14 +156,14 @@ pub fn escape_xml(text: &str) -> String {
     text.replace('&', "&")
         .replace('<', "<")
         .replace('>', ">")
-        .replace('"', """)
+        .replace('"', "\"")
         .replace('\'', "&apos;")
 }
 
 /// Desescapa XML
 pub fn unescape_xml(text: &str) -> String {
-    text.replace("&apos;", "'")
-        .replace(""", "\"")
+    text.replace("&apos;", "\u{27}")
+        .replace("\"", "\"")
         .replace(">", ">")
         .replace("<", "<")
         .replace("&", "&")

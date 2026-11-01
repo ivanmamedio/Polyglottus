@@ -9,6 +9,8 @@ pub mod xml;
 pub mod zip_safe;
 pub mod source_ref;
 
+use std::io::Write;
+use std::io::{Read, Seek};
 use std::path::Path;
 use pgl_app::{FormatId, Confidence, FormatError, AssetRef, DocumentMetadata, FidelityReport};
 use pgl_domain::{Unit, UnitId, UnitKind, SectionId, MarkedText, SourceRef};
@@ -101,17 +103,17 @@ pub trait ZipFormatWriter {
 }
 
 /// Documento fonte genérico para formatos ZIP
-pub struct ZipSourceDocument {
-    archive: zip::ZipArchive<std::fs::File>,
+pub struct ZipSourceDocument<R: Read + Seek + Send + Sync + 'static> {
+    archive: zip::ZipArchive<R>,
     units: Vec<Unit>,
     assets: Vec<AssetRef>,
     fidelity: FidelityReport,
     metadata: DocumentMetadata,
 }
 
-impl ZipSourceDocument {
+impl<R: Read + Seek + Send + Sync + 'static> ZipSourceDocument<R> {
     pub fn new(
-        archive: zip::ZipArchive<std::fs::File>,
+        archive: zip::ZipArchive<R>,
         units: Vec<Unit>,
         assets: Vec<AssetRef>,
         fidelity: FidelityReport,
@@ -121,7 +123,7 @@ impl ZipSourceDocument {
     }
 }
 
-impl pgl_app::SourceDocument for ZipSourceDocument {
+impl<R: Read + Seek + Send + Sync + 'static> pgl_app::SourceDocument for ZipSourceDocument<R> {
     fn units(&mut self) -> Box<dyn Iterator<Item = Result<Unit, FormatError>> + '_> {
         let units = std::mem::take(&mut self.units);
         Box::new(units.into_iter().map(Ok))
@@ -146,7 +148,7 @@ pub fn make_unit_id(source_ref: &SourceRef, text: &str) -> UnitId {
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
     source_ref.hash(&mut hasher);
     text.hash(&mut hasher);
-    UnitId::from_hash(&hasher.finish().to_le_bytes())
+    UnitId::from_hash(hasher.finish())
 }
 
 /// Helper para criar SourceRef padrão

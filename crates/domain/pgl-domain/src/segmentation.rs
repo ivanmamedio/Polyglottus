@@ -332,8 +332,9 @@ mod tests {
 
         let result = segmenter.recombine(&unit, &translated).unwrap();
         assert!(result.translation.is_some());
-        assert!(result.translation.unwrap().raw.contains("Traduzido 1"));
-        assert!(result.translation.unwrap().raw.contains("Traduzido 2"));
+        let translation = result.translation.unwrap();
+        assert!(translation.raw.contains("Traduzido 1"));
+        assert!(translation.raw.contains("Traduzido 2"));
     }
 
     #[test]

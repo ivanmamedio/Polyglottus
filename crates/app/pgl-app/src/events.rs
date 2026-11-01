@@ -155,7 +155,7 @@ impl JobUiState {
             can_pause: job.state == JobState::Running,
             can_resume: job.state == JobState::Paused || job.state == JobState::Created,
             can_cancel: matches!(job.state, JobState::Running | JobState::Paused),
-            can_retry: job.state == JobState::Failed,
+            can_retry: matches!(job.state, JobState::Failed(_)),
         }
     }
 }

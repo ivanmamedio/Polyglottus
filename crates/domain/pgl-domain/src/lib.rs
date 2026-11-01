@@ -55,6 +55,18 @@ impl Default for UnitId {
     }
 }
 
+impl From<Uuid> for UnitId {
+    fn from(uuid: Uuid) -> Self {
+        UnitId(uuid)
+    }
+}
+
+impl From<UnitId> for Uuid {
+    fn from(unit_id: UnitId) -> Uuid {
+        unit_id.0
+    }
+}
+
 impl fmt::Display for UnitId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
@@ -269,6 +281,8 @@ pub enum OutputFormat {
     VTT,
     XLIFF,
     TMX,
+    PO,
+    JSON_I18N,
 }
 
 /// Relatório de exportação
@@ -404,11 +418,11 @@ pub enum QaSeverity {
 }
 
 /// Re-export dos submódulos principais
-pub use glossary::Glossary;
+pub use glossary::{Glossary, GlossaryEntry};
 pub use job::{Job, JobConfig, JobProgress, JobState};
 pub use marked_text::MarkedText;
 pub use project::Project;
-pub use qa::{QaChecker as QaCheck, QaResult};
+pub use qa::{QaChecker as QaCheck, QaConfig, QaResult};
 pub use segmentation::{Segment, SegmentationRule};
 pub use style_guide::StyleGuide;
 pub use unit::Unit;

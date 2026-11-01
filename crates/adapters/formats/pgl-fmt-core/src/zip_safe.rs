@@ -2,7 +2,7 @@
 
 use zip::ZipArchive;
 use std::fs::File;
-use std::io::{Read, Seek};
+use std::io::{Read, Seek, Write};
 use std::path::{Path, PathBuf};
 use pgl_app::FormatError;
 
@@ -92,8 +92,8 @@ pub fn extract_entry_streaming<W: std::io::Write>(
     Ok(total)
 }
 
-/// Extrai entrada para bytes (para arquivos pequenos)
-pub fn extract_entry_bytes(archive: &mut ZipArchive<File>, index: usize) -> Result<Vec<u8>, FormatError> {
+/// Extrai entrada para bytes (para arquivos pequenos) pelo índice
+pub fn extract_entry_bytes<R: Read + Seek>(archive: &mut ZipArchive<R>, index: usize) -> Result<Vec<u8>, FormatError> {
     let mut entry = archive.by_index(index)?;
 
     if entry.size() > 50 * 1024 * 1024 { // 50 MB limite para carregar na memória
@@ -105,18 +105,30 @@ pub fn extract_entry_bytes(archive: &mut ZipArchive<File>, index: usize) -> Resu
     Ok(content)
 }
 
+/// Extrai entrada para bytes pelo nome
+pub fn extract_entry_bytes_by_name<R: Read + Seek>(archive: &mut ZipArchive<R>, name: &str) -> Result<Vec<u8>, FormatError> {
+    let index = archive.file_names()
+        .position(|n| n == name)
+        .ok_or_else(|| FormatError::ParseError(format!("Entry not found: {}", name)))?;
+    extract_entry_bytes(archive, index)
+}
+
 /// Lista entradas do ZIP de forma segura
-pub fn list_entries_safe(archive: &ZipArchive<File>) -> Vec<ZipEntryInfo> {
-    (0..archive.len())
-        .filter_map(|i| archive.by_index(i).ok())
-        .map(|entry| ZipEntryInfo {
-            name: entry.name().to_string(),
-            compressed_size: entry.compressed_size(),
-            uncompressed_size: entry.size(),
-            is_dir: entry.is_dir(),
-            compression_method: entry.compression(),
-        })
-        .collect()
+pub fn list_entries_safe<R: Read + Seek>(archive: &mut ZipArchive<R>) -> Vec<ZipEntryInfo> {
+    let len = archive.len();
+    let mut entries = Vec::with_capacity(len);
+    for i in 0..archive.len() {
+        if let Ok(entry) = archive.by_index(i) {
+            entries.push(ZipEntryInfo {
+                name: entry.name().to_string(),
+                compressed_size: entry.compressed_size(),
+                uncompressed_size: entry.size(),
+                is_dir: entry.is_dir(),
+                compression_method: entry.compression(),
+            });
+        }
+    }
+    entries
 }
 
 /// Info de entrada ZIP
@@ -130,9 +142,8 @@ pub struct ZipEntryInfo {
 }
 
 /// Cria ZIP writer seguro
-pub fn create_zip_safe(path: &Path) -> Result<zip::ZipWriter<File>, FormatError> {
-    let file = File::create(path)?;
-    Ok(zip::ZipWriter::new(file))
+pub fn create_zip_safe<W: Write + Seek>(writer: W) -> Result<zip::ZipWriter<W>, FormatError> {
+    Ok(zip::ZipWriter::new(writer))
 }
 
 /// Adiciona entrada ao ZIP de forma segura

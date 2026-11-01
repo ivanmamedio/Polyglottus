@@ -9,12 +9,12 @@
 #![warn(clippy::all, clippy::pedantic, clippy::nursery, clippy::cargo)]
 
 pub mod events;
-pub mod ports;
-pub mod use_cases;
 
 use std::path::Path;
 use std::sync::Arc;
 use pgl_domain::prelude::*;
+use pgl_domain::unit::PlaceholderError;
+use uuid::Uuid;
 
 /// Erros da camada de aplicação
 #[derive(Debug, thiserror::Error)]
@@ -53,11 +53,23 @@ pub enum AppError {
     Internal(#[from] anyhow::Error),
 }
 
+impl From<PlaceholderError> for AppError {
+    fn from(e: PlaceholderError) -> Self {
+        AppError::Validation(e.to_string())
+    }
+}
+
+impl From<std::io::Error> for AppError {
+    fn from(e: std::io::Error) -> Self {
+        AppError::Validation(e.to_string())
+    }
+}
+
 /// Re-export dos tipos de domínio mais usados
 pub use pgl_domain::{
-    Capabilities, ExportOptions, ExportReport, FidelityReport, Glossary, GlossaryEntry,
+    Capabilities, ExportOptions, ExportReport, FidelityReport, Glossary,
     Job, JobConfig, JobProgress, JobState, LangPair, Language, MarkedText, OutputFormat,
-    Project, ProjectMetadata, QaResult, QaSeverity, QaWarning, QaWarningCode, SectionId,
+    Project, QaResult, QaSeverity, QaWarning, QaWarningCode, SectionId,
     Segment, SegmentationRule, SourceRef, StyleGuide, TokenUsage, TranslateRequest,
     TranslateResponse, Unit, UnitId, UnitKind, UnitState, UnitTranslation,
 };
@@ -94,6 +106,18 @@ pub enum FormatError {
 
     #[error("Fidelity check failed: {0}")]
     FidelityError(String),
+
+    #[error("Zip error: {0}")]
+    Zip(#[from] zip::result::ZipError),
+
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+
+    #[error("UTF-8 error: {0}")]
+    Utf8(#[from] std::string::FromUtf8Error),
+
+    #[error("XML error: {0}")]
+    Xml(#[from] quick_xml::Error),
 }
 
 /// Leitor de formato: extrai unidades de forma incremental (streaming)
@@ -106,7 +130,7 @@ pub trait FormatReader: Send + Sync + 'static {
     fn sniff(&self, name: &str, head: &[u8]) -> Confidence;
 
     /// Abre documento e retorna iterator de unidades
-    async fn open(&self, path: &Path) -> Result<Box<dyn SourceDocument>, FormatError>;
+    async fn open(&self, path: &Path) -> Result<Box<dyn SourceDocument + 'static>, FormatError>;
 
     /// Extensões de arquivo suportadas
     fn extensions(&self) -> &'static [&'static str];
@@ -155,7 +179,7 @@ impl Confidence {
 
 /// Documento fonte aberto (produz unidades via streaming)
 #[async_trait::async_trait]
-pub trait SourceDocument: Send + Sync {
+pub trait SourceDocument: Send + Sync + 'static {
     /// Iterator de unidades (streaming - não carrega tudo na memória)
     fn units(&mut self) -> Box<dyn Iterator<Item = Result<Unit, FormatError>> + '_>;
 
@@ -354,6 +378,12 @@ pub enum StorageError {
     #[error("Database error: {0}")]
     Database(#[from] rusqlite::Error),
 
+    #[error("Database error: {0}")]
+    Sqlx(#[from] sqlx::Error),
+
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+
     #[error("Migration error: {0}")]
     Migration(String),
 }
@@ -475,6 +505,12 @@ pub enum ModelsError {
 
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
+
+    #[error("UTF-8 error: {0}")]
+    Utf8(#[from] std::string::FromUtf8Error),
+
+    #[error("XML error: {0}")]
+    Xml(#[from] quick_xml::Error),
 }
 
 /// Event sink para progresso, logs, etc.
@@ -660,6 +696,9 @@ where
             let batch = job.pending_units(job.config.batch_size);
             if batch.is_empty() { break; }
 
+            // Collect unit IDs to avoid borrow conflicts
+            let unit_ids: Vec<UnitId> = batch.iter().map(|u| u.id).collect();
+
             // Prepara requisição
             let req = TranslateRequest {
                 units: batch.iter().map(|u| (*u).clone()).collect(),
@@ -677,8 +716,8 @@ where
                 Ok(r) => r,
                 Err(e) => {
                     // Marca unidades como falhadas
-                    for unit in batch {
-                        if let Some(u) = job.unit_mut(&unit.id) {
+                    for unit_id in &unit_ids {
+                        if let Some(u) = job.unit_mut(unit_id) {
                             u.fail();
                         }
                     }
@@ -688,13 +727,17 @@ where
             };
 
             // Aplica traduções e QA
+            let lang_pair = job.config.lang_pair.clone();
+            let glossary = job.config.glossary.clone();
+            let enable_qa = job.config.enable_qa;
+
             for trans in response.translations {
                 if let Some(unit) = job.unit_mut(&trans.unit_id) {
                     unit.apply_translation(trans.translated_text)?;
 
                     // QA
-                    if job.config.enable_qa {
-                        let qa_result = self.qa_checker.check(unit, &job.config.lang_pair, job.config.glossary.as_ref());
+                    if enable_qa {
+                        let qa_result = self.qa_checker.check(unit, &lang_pair, glossary.as_ref());
                         if !qa_result.passed {
                             if qa_result.has_errors {
                                 unit.fail();
@@ -773,7 +816,8 @@ impl<Repo: ProjectRepository> ReviewUnit<Repo> {
         let mut unit = self.repo.load_unit(&unit_id).await?
             .ok_or(AppError::Validation("Unit not found".into()))?;
         unit.mark_reviewed();
-        self.repo.save_unit(&unit).await
+        self.repo.save_unit(&unit).await?;
+        Ok(())
     }
 
     pub async fn edit(&self, unit_id: UnitId, new_translation: MarkedText) -> Result<(), AppError> {
@@ -781,14 +825,16 @@ impl<Repo: ProjectRepository> ReviewUnit<Repo> {
             .ok_or(AppError::Validation("Unit not found".into()))?;
         unit.apply_translation(new_translation)?;
         unit.mark_reviewed();
-        self.repo.save_unit(&unit).await
+        self.repo.save_unit(&unit).await?;
+        Ok(())
     }
 
     pub async fn retraduze(&self, unit_id: UnitId) -> Result<(), AppError> {
         let mut unit = self.repo.load_unit(&unit_id).await?
             .ok_or(AppError::Validation("Unit not found".into()))?;
         unit.reset();
-        self.repo.save_unit(&unit).await
+        self.repo.save_unit(&unit).await?;
+        Ok(())
     }
 }
 
@@ -807,9 +853,12 @@ impl<W: FormatWriter, Repo: ProjectRepository> ExportBook<W, Repo> {
         let job = self.repo.load_job(&job_id).await?
             .ok_or(AppError::JobNotFound(job_id))?;
 
+        // Extract format ID before borrowing job
+        let source_format_id = job.config.lang_pair.source.0.clone();
+
         // Encontra writer apropriado
         let writer = self.writers.iter()
-            .find(|w| w.id() == FormatId(job.config.lang_pair.source.0.as_str())) // simplificado
+            .find(|w| w.id().0 == source_format_id)
             .ok_or_else(|| AppError::UnsupportedFormat("No writer for format".into()))?;
 
         // Constrói lookup de traduções

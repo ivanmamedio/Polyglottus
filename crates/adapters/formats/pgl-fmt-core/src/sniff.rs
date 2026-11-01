@@ -124,6 +124,7 @@ impl FormatSniffer {
 
             // Match por magic bytes
             for (magic, offset) in rule.magic_bytes {
+                let offset = *offset;
                 if head.len() >= offset + magic.len() && &head[offset..offset + magic.len()] == *magic {
                     confidence = Confidence::certain();
                     break;
