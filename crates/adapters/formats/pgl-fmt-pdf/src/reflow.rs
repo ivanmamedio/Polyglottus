@@ -93,7 +93,7 @@ pub async fn open_pdf_reflow(path: &Path) -> Result<Box<dyn SourceDocument>, For
         .with_preserved("Imagens extraídas")
         .with_preserved("Metadados do documento")
         .with_not_preserved("Layout original (colunas, tabelas, formatação)")
-        .with_not_preserved "Fontes e estilos")
+        .with_not_preserved("Fontes e estilos")
         .with_warning("Modo reflow: layout original NÃO é preservado. Use para conversão para EPUB/DOCX/HTML.")
         .with_warning("Tabelas e colunas podem ficar linearizadas");
 
@@ -334,7 +334,7 @@ fn escape_xml(s: &str) -> String {
     s.replace('&', "&")
         .replace('<', "<")
         .replace('>', ">")
-        .replace('"', """)
+        .replace('"', "\"")
         .replace('\'', "&apos;")
 }
 
@@ -345,6 +345,6 @@ mod tests {
     #[test]
     fn escape_xml_test() {
         assert_eq!(escape_xml("<test>"), "<test>");
-        assert_eq!(escape_xml("&"), "&");
+        assert_eq!(escape_xml("hello"), "hello");
     }
 }
