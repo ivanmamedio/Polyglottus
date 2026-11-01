@@ -2,7 +2,7 @@
 name = "pgl-fmt-odf"
 version = "0.1.0"
 edition = "2021"
-description = "Adaptador ODF (ODT, ODP, ODS) via patch engine"
+description = "Adaptador ODF (ODT, ODP, ODS)"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
@@ -14,11 +14,14 @@ lo_odf = { workspace = true }
 zip = { workspace = true }
 quick-xml = { workspace = true }
 html5ever = { workspace = true }
-mime_guess = { workspace = true }
+mime_guess = "2.0"
 md5 = { workspace = true }
+async-trait = { workspace = true }
+tokio = { workspace = true }
+serde_json = { workspace = true }
+serde = { workspace = true }
 thiserror = { workspace = true }
 anyhow = { workspace = true }
-serde = { workspace = true }
 
 [dev-dependencies]
 insta = { workspace = true }
