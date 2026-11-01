@@ -119,25 +119,23 @@ async fn test_qa_validation() {
         SectionId::new(),
     );
     
-    // Tradução mantém placeholder
     let translated = MarkedText::from_html("Pressione <b>⟦1⟧OK⟦/1⟧</b> para continuar").unwrap();
     let unit_with_translation = Unit {
         translation: Some(translated),
         ..unit.clone()
     };
-    let result = qa_checker.check(&unit_with_translation, &LangPair {
+    let result = QaCheck::new(QaConfig::default()).check(&unit, &LangPair {
         source: Language::new("en"),
         target: Language::new("pt"),
     }, None);
     
     assert!(result.warnings.iter().all(|w| w.code != QaWarningCode::PlaceholderMismatch));
     
-    // Tradução sem placeholder (erro)
     let bad_unit = Unit {
         translation: Some(MarkedText::new("Pressione OK para continuar")),
         ..unit
     };
-    let result = qa_checker.check(&bad_unit, &LangPair {
+    let result = QaCheck::new(QaConfig::default()).check(&bad_unit, &LangPair {
         source: Language::new("en"),
         target: Language::new("pt"),
     }, None);

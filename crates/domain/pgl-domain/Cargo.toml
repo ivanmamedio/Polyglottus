@@ -18,6 +18,8 @@ chrono = { workspace = true, features = ["serde"] }
 hex = { workspace = true }
 csv = { workspace = true }
 regex = { workspace = true }
+comrak = { version = "0.20", features = ["default"] }
+html5ever = { workspace = true }
 
 [dev-dependencies]
 proptest = { workspace = true }

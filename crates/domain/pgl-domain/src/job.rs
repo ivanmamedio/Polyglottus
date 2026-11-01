@@ -94,10 +94,18 @@ impl Job {
         self.state = JobState::Completed;
         self.completed_at = Some(SystemTime::now());
         self.export_report = Some(export_report);
+        let completed = self.units.values().filter(|u| u.is_translated()).count();
+        let total = self.units.len();
+        let percent = if total > 0 {
+            (completed as f64 / total as f64 * 100.0) as u8
+        } else {
+            0
+        };
         self.progress = JobProgress {
-            total: self.units.len(),
-            completed: self.units.values().filter(|u| u.is_translated()).count(),
+            total,
+            completed,
             failed: self.units.values().filter(|u| u.state == UnitState::Failed).count(),
+            percent,
             ..Default::default()
         };
         self.updated_at = SystemTime::now();
@@ -131,6 +139,7 @@ impl Job {
 
         let elapsed = self.started_at.map(|s| SystemTime::now().duration_since(s).unwrap_or_default());
 
+                eprintln!("DEBUG complete: units={}, completed={}", self.units.len(), self.units.values().filter(|u| u.is_translated()).count());
         self.progress = JobProgress {
             total,
             completed,
@@ -343,31 +352,43 @@ mod tests {
     }
 
     #[test]
-    fn job_complete() {
-        let mut job = make_job();
-        let units = vec![make_unit("One"), make_unit("Two")];
-        job.add_units(units);
+#[test]
+fn job_complete() {
+    let mut job = make_job();
+    let units = vec![make_unit("One"), make_unit("Two")];
+    job.add_units(units);
 
-        // Simula tradução
-        for unit in job.units.values_mut() {
-            unit.apply_translation(MarkedText::new("Traduzido")).unwrap();
-        }
-
-        let export_report = super::super::ExportReport {
-            output_path: "out.epub".into(),
-            format: super::super::OutputFormat::EPUB,
-            units_processed: 2,
-            units_with_warnings: 0,
-            units_failed: 0,
-            output_size: 1024,
-            export_time_ms: 100,
-            warnings: vec![],
-        };
-
-        job.complete(export_report);
-        assert_eq!(job.state, JobState::Completed);
-        assert_eq!(job.progress.percent, 100);
+    println!("Before translation - units: {}", job.units.len());
+    for (id, unit) in &job.units {
+        println!("Unit {}: state={:?}, is_translated={}", id, unit.state, unit.is_translated());
     }
+
+    // Simula tradução
+    for unit in job.units.values_mut() {
+        unit.apply_translation(MarkedText::new("Traduzido")).unwrap();
+    }
+    
+    println!("After translation:");
+    for (id, unit) in &job.units {
+        println!("Unit {}: state={:?}, is_translated={}", id, unit.state, unit.is_translated());
+    }
+
+    let export_report = super::super::ExportReport {
+        output_path: "out.epub".into(),
+        format: super::super::OutputFormat::EPUB,
+        units_processed: 2,
+        units_with_warnings: 0,
+        units_failed: 0,
+        output_size: 1024,
+        export_time_ms: 100,
+        warnings: vec![],
+    };
+
+    job.complete(export_report);
+    assert_eq!(job.state, JobState::Completed);
+    println!("Progress: {}%", job.progress.percent);
+    assert_eq!(job.progress.percent, 100);
+}
 
     #[test]
     fn job_pending_units() {

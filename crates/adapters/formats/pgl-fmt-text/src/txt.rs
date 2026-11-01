@@ -9,6 +9,18 @@ use zip::ZipArchive;
 type SourceDoc = Box<dyn SourceDocument + 'static>;
 
 
+fn create_empty_zip() -> Vec<u8> {
+    use zip::ZipWriter;
+    use std::io::Cursor;
+    let mut buf = Vec::new();
+    {
+        let mut zip = ZipWriter::new(Cursor::new(&mut buf));
+        zip.finish().unwrap();
+    }
+    buf
+}
+
+
 /// Abre TXT como SourceDocument
 pub async fn open_txt(path: &Path) -> Result<SourceDoc, FormatError> {
     let content = tokio::fs::read_to_string(path).await?;
@@ -23,6 +35,7 @@ pub async fn open_txt(path: &Path) -> Result<SourceDoc, FormatError> {
     let section = SectionId::new();
 
     for (idx, para) in paragraphs.iter().enumerate() {
+        let para_str: &str = para;
         let unit_id = UnitId::new();
         let source_ref = SourceRef {
             internal_path: path.file_name().unwrap_or_default().to_string_lossy().to_string(),
@@ -31,7 +44,7 @@ pub async fn open_txt(path: &Path) -> Result<SourceDoc, FormatError> {
             length: Some(para.len()),
         };
 
-        let mut unit = Unit::new(source_ref, UnitKind::Paragraph, MarkedText::new(para), section);
+        let mut unit = Unit::new(source_ref, UnitKind::Paragraph, MarkedText::new(para_str), section);
         unit.id = unit_id;
         units.push(unit);
     }
@@ -42,7 +55,7 @@ pub async fn open_txt(path: &Path) -> Result<SourceDoc, FormatError> {
         .with_not_preserved("Formatação rica (não existe em TXT)")
         .with_warning("Perde formatação se convertido de outro formato");
 
-    let empty_archive = ZipArchive::new(std::io::Cursor::new(Vec::new()))?;
+    let empty_archive = ZipArchive::new(std::io::Cursor::new(create_empty_zip())).unwrap();
 
     Ok(Box::new(ZipSourceDocument::new(
         empty_archive, units, vec![], fidelity, Default::default()
@@ -66,13 +79,13 @@ pub async fn write_txt(
     let mut output_paragraphs = Vec::new();
 
     for (idx, para) in paragraphs.iter().enumerate() {
-        let unit_id = UnitId::from_hash(&{
+        let unit_id = UnitId::from_hash({
             use std::hash::{Hash, Hasher};
             let mut hasher = std::collections::hash_map::DefaultHasher::new();
             source.file_name().unwrap_or_default().to_string_lossy().hash(&mut hasher);
             format!("paragraph[{}]", idx).hash(&mut hasher);
             para.hash(&mut hasher);
-            hasher.finish().to_le_bytes()
+            hasher.finish()
         });
 
         if let Some(translated) = translations.get(&unit_id) {
@@ -116,7 +129,7 @@ mod tests {
         writeln!(f, "").unwrap();
         writeln!(f, "Second paragraph").unwrap();
 
-        let units = open_txt(f.path()).await.unwrap();
+        let mut units = open_txt(f.path()).await.unwrap();
         let units_vec: Vec<_> = units.units().collect();
         assert_eq!(units_vec.len(), 2);
     }

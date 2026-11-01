@@ -75,6 +75,18 @@ fn extract_pairs(json: &Value, prefix: &str, pairs: &mut Vec<(String, String, Op
     }
 }
 
+fn create_empty_zip() -> Vec<u8> {
+    use zip::ZipWriter;
+    use std::io::Cursor;
+    let mut buf = Vec::new();
+    {
+        let mut zip = ZipWriter::new(Cursor::new(&mut buf));
+        zip.finish().unwrap();
+    }
+    buf
+}
+
+
 /// Abre JSON i18n como SourceDocument
 pub async fn open_json_i18n(path: &Path) -> Result<SourceDoc, FormatError> {
     let content = tokio::fs::read_to_string(path).await?;
@@ -113,9 +125,9 @@ pub async fn open_json_i18n(path: &Path) -> Result<SourceDoc, FormatError> {
         .with_preserved("Descrições/contexto (se houver)")
         .with_preserved("Plurais ICU (se detectados)")
         .with_not_preserved("Comentários JSON (não padrão)")
-        .with_warning("Formato detectado automaticamente: {:?}", format);
+        .with_warning(&format!("Formato detectado automaticamente: {:?}", format));
 
-    let empty_archive = ZipArchive::new(std::io::Cursor::new(Vec::new()))?;
+    let empty_archive = ZipArchive::new(std::io::Cursor::new(create_empty_zip())).unwrap();
 
     Ok(Box::new(ZipSourceDocument::new(
         empty_archive, units, vec![], fidelity, Default::default()
@@ -140,12 +152,12 @@ pub async fn write_json_i18n(
     // Aplica traduções
     let mut translated_count = 0;
     for (key, original, _) in &pairs {
-        let unit_id = UnitId::from_hash(&{
+        let unit_id = UnitId::from_hash({
             use std::hash::{Hash, Hasher};
             let mut hasher = std::collections::hash_map::DefaultHasher::new();
             key.hash(&mut hasher);
             original.hash(&mut hasher);
-            hasher.finish().to_le_bytes()
+            hasher.finish()
         });
 
         if let Some(translated) = translations.get(&unit_id) {
@@ -157,12 +169,12 @@ pub async fn write_json_i18n(
     // Bilíngue: adiciona sufixo _translated ou cria estrutura paralela
     if options.bilingual {
         for (key, original, _) in &pairs {
-            let unit_id = UnitId::from_hash(&{
+            let unit_id = UnitId::from_hash({
                 use std::hash::{Hash, Hasher};
                 let mut hasher = std::collections::hash_map::DefaultHasher::new();
                 key.hash(&mut hasher);
                 original.hash(&mut hasher);
-                hasher.finish().to_le_bytes()
+                hasher.finish()
             });
 
             if let Some(translated) = translations.get(&unit_id) {
@@ -193,7 +205,7 @@ fn set_json_value(json: &mut Value, path: &str, value: &str) {
     let parts: Vec<&str> = path.split('.').collect();
     let mut current = json;
 
-    for (i, part) in parts.iter().enumerate() {
+    for (i, part) in parts.iter().copied().enumerate() {
         if i == parts.len() - 1 {
             // Último nível - define valor
             if let Value::Object(obj) = current {
@@ -230,7 +242,7 @@ mod tests {
         let mut f = NamedTempFile::new().unwrap();
         writeln!(f, r#"{{"greeting": "Hello", "farewell": "Goodbye"}}"#).unwrap();
 
-        let units = open_json_i18n(f.path()).await.unwrap();
+        let mut units = open_json_i18n(f.path()).await.unwrap();
         let units_vec: Vec<_> = units.units().collect();
         assert_eq!(units_vec.len(), 2);
     }
@@ -240,9 +252,9 @@ mod tests {
         let mut f = NamedTempFile::new().unwrap();
         writeln!(f, r#"{{"welcome": {{"message": "Welcome", "description": "Home page greeting"}}}}"#).unwrap();
 
-        let units = open_json_i18n(f.path()).await.unwrap();
+        let mut units = open_json_i18n(f.path()).await.unwrap();
         let units_vec: Vec<_> = units.units().collect();
         assert_eq!(units_vec.len(), 1);
-        assert_eq!(units_vec[0].metadata.get("description").unwrap().as_str().unwrap(), "Home page greeting");
+        assert_eq!(units_vec[0].as_ref().unwrap().metadata.get("description").unwrap().as_str().unwrap(), "Home page greeting");
     }
 }

@@ -102,6 +102,18 @@ fn parse_po(content: &str) -> Result<Vec<PoEntry>, FormatError> {
     Ok(entries)
 }
 
+fn create_empty_zip() -> Vec<u8> {
+    use zip::ZipWriter;
+    use std::io::Cursor;
+    let mut buf = Vec::new();
+    {
+        let mut zip = ZipWriter::new(Cursor::new(&mut buf));
+        zip.finish().unwrap();
+    }
+    buf
+}
+
+
 /// Abre PO como SourceDocument
 pub async fn open_po(path: &Path) -> Result<SourceDoc, FormatError> {
     let content = tokio::fs::read_to_string(path).await?;
@@ -145,7 +157,7 @@ pub async fn open_po(path: &Path) -> Result<SourceDoc, FormatError> {
         .with_not_preserved("Formatação rica")
         .with_warning("Plurais requerem tratamento especial");
 
-    let empty_archive = ZipArchive::new(std::io::Cursor::new(Vec::new()))?;
+    let empty_archive = ZipArchive::new(std::io::Cursor::new(create_empty_zip())).unwrap();
 
     Ok(Box::new(ZipSourceDocument::new(
         empty_archive, units, vec![], fidelity, Default::default()
@@ -161,6 +173,7 @@ pub async fn write_po(
 ) -> Result<ExportReport, FormatError> {
     let content = tokio::fs::read_to_string(source).await?;
     let entries = parse_po(&content)?;
+    let entries_len = entries.len();
 
     let mut output = String::new();
 
@@ -190,12 +203,12 @@ pub async fn write_po(
         output.push_str(&format!("msgid \"{}\"\n", escape_po(&entry.msgid)));
 
         // Busca tradução
-        let unit_id = UnitId::from_hash(&{
+        let unit_id = UnitId::from_hash({
             use std::hash::{Hash, Hasher};
             let mut hasher = std::collections::hash_map::DefaultHasher::new();
             entry.msgid.hash(&mut hasher);
             entry.context.hash(&mut hasher);
-            hasher.finish().to_le_bytes()
+            hasher.finish()
         });
 
         let msgstr = if let Some(translated) = translations.get(&unit_id) {
@@ -213,7 +226,7 @@ pub async fn write_po(
     Ok(ExportReport {
         output_path: out.display().to_string(),
         format: OutputFormat::PO,
-        units_processed: entries.len(),
+        units_processed: entries_len,
         units_with_warnings: 0,
         units_failed: 0,
         output_size: std::fs::metadata(out)?.len(),
@@ -245,7 +258,7 @@ mod tests {
         writeln!(f, "msgid \"World\"").unwrap();
         writeln!(f, "msgstr \"Mundo\"").unwrap();
 
-        let units = open_po(f.path()).await.unwrap();
+        let mut units = open_po(f.path()).await.unwrap();
         let units_vec: Vec<_> = units.units().collect();
         assert_eq!(units_vec.len(), 2);
     }

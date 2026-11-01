@@ -42,6 +42,18 @@ fn parse_srt(content: &str) -> Result<Vec<SubtitleEntry>, FormatError> {
     Ok(entries)
 }
 
+fn create_empty_zip() -> Vec<u8> {
+    use zip::ZipWriter;
+    use std::io::Cursor;
+    let mut buf = Vec::new();
+    {
+        let mut zip = ZipWriter::new(Cursor::new(&mut buf));
+        zip.finish().unwrap();
+    }
+    buf
+}
+
+
 /// Abre SRT como SourceDocument
 pub async fn open_srt(path: &Path) -> Result<SourceDoc, FormatError> {
     let content = tokio::fs::read_to_string(path).await?;
@@ -78,7 +90,7 @@ pub async fn open_srt(path: &Path) -> Result<SourceDoc, FormatError> {
         .with_not_preserved("Posicionamento avançado")
         .with_warning("Expansão de texto pode dessincronizar legendas");
 
-    let empty_archive = ZipArchive::new(std::io::Cursor::new(Vec::new()))?;
+    let empty_archive = ZipArchive::new(std::io::Cursor::new(create_empty_zip())).unwrap();
 
     Ok(Box::new(ZipSourceDocument::new(
         empty_archive, units, vec![], fidelity, Default::default()
@@ -94,16 +106,17 @@ pub async fn write_srt(
 ) -> Result<ExportReport, FormatError> {
     let content = tokio::fs::read_to_string(source).await?;
     let entries = parse_srt(&content)?;
+    let entries_len = entries.len();
 
     let mut output = String::new();
 
     for entry in entries {
-        let unit_id = UnitId::from_hash(&{
+        let unit_id = UnitId::from_hash({
             use std::hash::{Hash, Hasher};
             let mut hasher = std::collections::hash_map::DefaultHasher::new();
             entry.index.hash(&mut hasher);
             entry.text.hash(&mut hasher);
-            hasher.finish().to_le_bytes()
+            hasher.finish()
         });
 
         let translated_text = if let Some(translated) = translations.get(&unit_id) {
@@ -124,7 +137,7 @@ pub async fn write_srt(
     Ok(ExportReport {
         output_path: out.display().to_string(),
         format: OutputFormat::SRT,
-        units_processed: entries.len(),
+        units_processed: entries_len,
         units_with_warnings: 0,
         units_failed: 0,
         output_size: std::fs::metadata(out)?.len(),
@@ -147,10 +160,10 @@ mod tests {
         writeln!(f, "Hello world").unwrap();
         writeln!(f, "").unwrap();
         writeln!(f, "2").unwrap();
-        writeln!(f, "00:00:05,000 --> 00:00:08,000").unwrap;
+        writeln!(f, "00:00:05,000 --> 00:00:08,000").unwrap();
         writeln!(f, "Second subtitle").unwrap();
 
-        let units = open_srt(f.path()).await.unwrap();
+        let mut units = open_srt(f.path()).await.unwrap();
         let units_vec: Vec<_> = units.units().collect();
         assert_eq!(units_vec.len(), 2);
     }

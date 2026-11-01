@@ -420,7 +420,7 @@ pub enum QaSeverity {
 /// Re-export dos submódulos principais
 pub use glossary::{Glossary, GlossaryEntry};
 pub use job::{Job, JobConfig, JobProgress, JobState};
-pub use marked_text::MarkedText;
+pub use marked_text::{MarkedText, MarkError};
 pub use project::Project;
 pub use qa::{QaChecker as QaCheck, QaConfig, QaResult};
 pub use segmentation::{Segment, SegmentationRule};

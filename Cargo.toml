@@ -79,6 +79,7 @@ zeroize = "1.7"
 zip = "0.6"
 quick-xml = { version = "0.31", features = ["serialize"] }
 html5ever = "0.26"
+comrak = { version = "0.20", features = ["default"] }
 scraper = "0.19"
 lopdf = "0.31"
 pdfium-render = { version = "0.9", features = [] }

@@ -26,7 +26,7 @@ use std::collections::HashMap;
 fn parse_tmx(content: &str) -> Result<Vec<TmxTu>, FormatError> {
     let mut tus = Vec::new();
     let mut reader = Reader::from_str(content);
-    reader.config().trim_text(true);
+    reader.trim_text(true);
 
     let mut current_tu: Option<TmxTu> = None;
     let mut current_tuv: Option<(String, String)> = None; // (lang, text)
@@ -125,6 +125,18 @@ fn parse_tmx(content: &str) -> Result<Vec<TmxTu>, FormatError> {
     Ok(tus)
 }
 
+fn create_empty_zip() -> Vec<u8> {
+    use zip::ZipWriter;
+    use std::io::Cursor;
+    let mut buf = Vec::new();
+    {
+        let mut zip = ZipWriter::new(Cursor::new(&mut buf));
+        zip.finish().unwrap();
+    }
+    buf
+}
+
+
 /// Abre TMX como SourceDocument
 pub async fn open_tmx(path: &Path) -> Result<SourceDoc, FormatError> {
     let content = tokio::fs::read_to_string(path).await?;
@@ -162,7 +174,7 @@ pub async fn open_tmx(path: &Path) -> Result<SourceDoc, FormatError> {
         .with_not_preserved("Formatação rica")
         .with_warning("TMX é para memórias de tradução, não documentos completos");
 
-    let empty_archive = ZipArchive::new(std::io::Cursor::new(Vec::new()))?;
+    let empty_archive = ZipArchive::new(std::io::Cursor::new(create_empty_zip())).unwrap();
 
     Ok(Box::new(ZipSourceDocument::new(
         empty_archive, units, vec![], fidelity, Default::default()
@@ -178,6 +190,7 @@ pub async fn write_tmx(
 ) -> Result<ExportReport, FormatError> {
     let content = tokio::fs::read_to_string(source).await?;
     let tus = parse_tmx(&content)?;
+    let tus_len = tus.len();
 
     let mut output = String::new();
     output.push_str("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
@@ -195,12 +208,12 @@ pub async fn write_tmx(
         output.push_str(&format!("      <tuv xml:lang=\"{}\"><seg>{}</seg></tuv>\n",
             escape_xml(&tu.source_lang), escape_xml(&tu.source_text)));
 
-        let unit_id = UnitId::from_hash(&{
+        let unit_id = UnitId::from_hash({
             use std::hash::{Hash, Hasher};
             let mut hasher = std::collections::hash_map::DefaultHasher::new();
             tu.source_text.hash(&mut hasher);
             tu.source_lang.hash(&mut hasher);
-            hasher.finish().to_le_bytes()
+            hasher.finish()
         });
 
         let target_text = if let Some(translated) = translations.get(&unit_id) {
@@ -225,7 +238,7 @@ pub async fn write_tmx(
     Ok(ExportReport {
         output_path: out.display().to_string(),
         format: OutputFormat::TMX,
-        units_processed: tus.len(),
+        units_processed: tus_len,
         units_with_warnings: 0,
         units_failed: 0,
         output_size: std::fs::metadata(out)?.len(),
@@ -259,7 +272,7 @@ mod tests {
         writeln!(f, r#"  </body>"#).unwrap();
         writeln!(f, "</tmx>").unwrap();
 
-        let units = open_tmx(f.path()).await.unwrap();
+        let mut units = open_tmx(f.path()).await.unwrap();
         let units_vec: Vec<_> = units.units().collect();
         assert_eq!(units_vec.len(), 1);
     }

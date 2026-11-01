@@ -24,22 +24,60 @@ fn parse_vtt(content: &str) -> Result<Vec<VttCue>, FormatError> {
     // Skip WEBVTT header
     let content = content.strip_prefix("WEBVTT").unwrap_or(content).trim_start();
 
-    let cue_regex = Regex::new(r"(?:(\S+)\n)?(\d{2}:\d{2}:\d{2}\.\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2}\.\d{3})(?:\s+(.+))?\n((?:.+\n)*)").unwrap();
+    eprintln!("DEBUG parse_vtt: content = {:?}", content);
 
-    for cap in cue_regex.captures_iter(content) {
-        let identifier = cap.get(1).map(|m| m.as_str().to_string());
-        let start = cap.get(2).unwrap().as_str().to_string();
-        let end = cap.get(3).unwrap().as_str().to_string();
-        let settings = cap.get(4).map(|m| m.as_str().to_string()).unwrap_or_default();
-        let text = cap.get(5).unwrap().as_str().trim().to_string();
+    // Split by double newline to get cue blocks
+    let blocks: Vec<&str> = content.split("\n\n").collect();
+    eprintln!("DEBUG: blocks = {:?}", blocks);
 
-        if !text.is_empty() {
-            cues.push(VttCue { identifier, start, end, settings, text });
+    let time_regex = Regex::new(r"(?:(\S+)\n)?(\d{2}:\d{2}:\d{2}\.\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2}\.\d{3})(?:[ \t]+([^\n]+))?\n([\s\S]*)").unwrap();
+
+    for block in blocks {
+        if block.trim().is_empty() {
+            continue;
+        }
+        
+        eprintln!("DEBUG: processing block = {:?}", block);
+        
+        if let Some(cap) = time_regex.captures(block) {
+            eprintln!("DEBUG: match found in block");
+            eprintln!("DEBUG: cap[0] = {:?}", cap.get(0).map(|m| m.as_str()));
+            eprintln!("DEBUG: cap[1] = {:?}", cap.get(1).map(|m| m.as_str()));
+            eprintln!("DEBUG: cap[2] = {:?}", cap.get(2).map(|m| m.as_str()));
+            eprintln!("DEBUG: cap[3] = {:?}", cap.get(3).map(|m| m.as_str()));
+            eprintln!("DEBUG: cap[4] = {:?}", cap.get(4).map(|m| m.as_str()));
+            eprintln!("DEBUG: cap[5] = {:?}", cap.get(5).map(|m| m.as_str()));
+            
+            let identifier = cap.get(1).map(|m| m.as_str().to_string());
+            let start = cap.get(2).unwrap().as_str().to_string();
+            let end = cap.get(3).unwrap().as_str().to_string();
+            let settings = cap.get(4).map(|m| m.as_str().to_string()).unwrap_or_default();
+            let text = cap.get(5).unwrap().as_str().trim().to_string();
+
+            eprintln!("DEBUG: identifier={:?}, start={}, end={}, text={:?}", identifier, start, end, text);
+
+            if !text.is_empty() {
+                cues.push(VttCue { identifier, start, end, settings, text });
+            }
+        } else {
+            eprintln!("DEBUG: no match for block");
         }
     }
 
     Ok(cues)
 }
+
+fn create_empty_zip() -> Vec<u8> {
+    use zip::ZipWriter;
+    use std::io::Cursor;
+    let mut buf = Vec::new();
+    {
+        let mut zip = ZipWriter::new(Cursor::new(&mut buf));
+        zip.finish().unwrap();
+    }
+    buf
+}
+
 
 /// Abre VTT como SourceDocument
 pub async fn open_vtt(path: &Path) -> Result<SourceDoc, FormatError> {
@@ -77,7 +115,7 @@ pub async fn open_vtt(path: &Path) -> Result<SourceDoc, FormatError> {
         .with_not_preserved("Comentários (NOTE)")
         .with_warning("Expansão de texto pode dessincronizar legendas");
 
-    let empty_archive = ZipArchive::new(std::io::Cursor::new(Vec::new()))?;
+    let empty_archive = ZipArchive::new(std::io::Cursor::new(create_empty_zip())).unwrap();
 
     Ok(Box::new(ZipSourceDocument::new(
         empty_archive, units, vec![], fidelity, Default::default()
@@ -93,17 +131,18 @@ pub async fn write_vtt(
 ) -> Result<ExportReport, FormatError> {
     let content = tokio::fs::read_to_string(source).await?;
     let cues = parse_vtt(&content)?;
+    let cues_len = cues.len();
 
     let mut output = String::from("WEBVTT\n\n");
 
     for cue in cues {
-        let unit_id = UnitId::from_hash(&{
+        let unit_id = UnitId::from_hash({
             use std::hash::{Hash, Hasher};
             let mut hasher = std::collections::hash_map::DefaultHasher::new();
             cue.identifier.hash(&mut hasher);
             cue.start.hash(&mut hasher);
             cue.text.hash(&mut hasher);
-            hasher.finish().to_le_bytes()
+            hasher.finish()
         });
 
         let translated_text = if let Some(translated) = translations.get(&unit_id) {
@@ -131,7 +170,7 @@ pub async fn write_vtt(
     Ok(ExportReport {
         output_path: out.display().to_string(),
         format: OutputFormat::VTT,
-        units_processed: cues.len(),
+        units_processed: cues_len,
         units_with_warnings: 0,
         units_failed: 0,
         output_size: std::fs::metadata(out)?.len(),
@@ -155,10 +194,11 @@ mod tests {
         writeln!(f, "00:00:01.000 --> 00:00:04.000").unwrap();
         writeln!(f, "Hello world").unwrap();
         writeln!(f, "").unwrap();
+        writeln!(f, "2").unwrap();
         writeln!(f, "00:00:05.000 --> 00:00:08.000").unwrap();
         writeln!(f, "Second subtitle").unwrap();
 
-        let units = open_vtt(f.path()).await.unwrap();
+        let mut units = open_vtt(f.path()).await.unwrap();
         let units_vec: Vec<_> = units.units().collect();
         assert_eq!(units_vec.len(), 2);
     }

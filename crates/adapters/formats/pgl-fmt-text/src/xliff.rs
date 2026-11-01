@@ -22,7 +22,7 @@ struct XliffUnit {
 fn parse_xliff(content: &str) -> Result<Vec<XliffUnit>, FormatError> {
     let mut units = Vec::new();
     let mut reader = Reader::from_str(content);
-    reader.config().trim_text(true);
+    reader.trim_text(true);
 
     let mut current_unit: Option<XliffUnit> = None;
     let mut in_source = false;
@@ -99,6 +99,18 @@ fn parse_xliff(content: &str) -> Result<Vec<XliffUnit>, FormatError> {
     Ok(units)
 }
 
+fn create_empty_zip() -> Vec<u8> {
+    use zip::ZipWriter;
+    use std::io::Cursor;
+    let mut buf = Vec::new();
+    {
+        let mut zip = ZipWriter::new(Cursor::new(&mut buf));
+        zip.finish().unwrap();
+    }
+    buf
+}
+
+
 /// Abre XLIFF como SourceDocument
 pub async fn open_xliff(path: &Path) -> Result<SourceDoc, FormatError> {
     let content = tokio::fs::read_to_string(path).await?;
@@ -139,7 +151,7 @@ pub async fn open_xliff(path: &Path) -> Result<SourceDoc, FormatError> {
         .with_not_preserved("Validação de esquema")
         .with_warning("XLIFF 2.0 tem recursos avançados não totalmente suportados");
 
-    let empty_archive = ZipArchive::new(std::io::Cursor::new(Vec::new()))?;
+    let empty_archive = ZipArchive::new(std::io::Cursor::new(create_empty_zip())).unwrap();
 
     Ok(Box::new(ZipSourceDocument::new(
         empty_archive, units, vec![], fidelity, Default::default()
@@ -155,6 +167,7 @@ pub async fn write_xliff(
 ) -> Result<ExportReport, FormatError> {
     let content = tokio::fs::read_to_string(source).await?;
     let units_data = parse_xliff(&content)?;
+    let units_data_len = units_data.len();
 
     let mut output = String::new();
     output.push_str("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
@@ -170,12 +183,12 @@ pub async fn write_xliff(
         output.push_str(">\n");
         output.push_str(&format!("        <source>{}</source>\n", escape_xml(&entry.source)));
 
-        let unit_id = UnitId::from_hash(&{
+        let unit_id = UnitId::from_hash({
             use std::hash::{Hash, Hasher};
             let mut hasher = std::collections::hash_map::DefaultHasher::new();
             entry.id.hash(&mut hasher);
             entry.source.hash(&mut hasher);
-            hasher.finish().to_le_bytes()
+            hasher.finish()
         });
 
         let target = if let Some(translated) = translations.get(&unit_id) {
@@ -204,7 +217,7 @@ pub async fn write_xliff(
     Ok(ExportReport {
         output_path: out.display().to_string(),
         format: OutputFormat::XLIFF,
-        units_processed: units_data.len(),
+        units_processed: units_data_len,
         units_with_warnings: 0,
         units_failed: 0,
         output_size: std::fs::metadata(out)?.len(),
@@ -239,7 +252,7 @@ mod tests {
         writeln!(f, "  </file>").unwrap();
         writeln!(f, "</xliff>").unwrap();
 
-        let units = open_xliff(f.path()).await.unwrap();
+        let mut units = open_xliff(f.path()).await.unwrap();
         let units_vec: Vec<_> = units.units().collect();
         assert_eq!(units_vec.len(), 1);
     }

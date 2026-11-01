@@ -81,6 +81,7 @@ impl MarkedText {
                     // Closing tag
                     if let Some(open_num) = tag_stack.pop() {
                         let ph = format!("⟦/{open_num}⟧");
+                        eprintln!("DEBUG from_html: created closing placeholder '{}' for tag '{}'", ph, tag);
                         raw.push_str(&ph);
                         placeholders.insert(format!("/{}", open_num), tag);
                     } else {
@@ -90,6 +91,7 @@ impl MarkedText {
                     // Opening tag
                     placeholder_counter += 1;
                     let ph = format!("⟦{}⟧", placeholder_counter);
+                    eprintln!("DEBUG from_html: created placeholder '{}' (bytes: {:?}) for tag '{}'", ph, ph.as_bytes(), tag);
                     raw.push_str(&ph);
                     placeholders.insert(placeholder_counter.to_string(), tag.clone());
                     tag_stack.push(placeholder_counter);
@@ -112,34 +114,50 @@ impl MarkedText {
 
     /// Restaura a marcação original a partir dos placeholders
     pub fn restore(&self) -> Result<String, RestoreError> {
+        eprintln!("DEBUG RESTORE: raw='{}'", self.raw);
         let mut result = String::with_capacity(self.raw.len() + self.placeholders.len() * 4);
+        let raw_chars: Vec<char> = self.raw.chars().collect();
+        eprintln!("DEBUG: raw chars: {:?}", self.raw.chars().collect::<Vec<_>>());
+        
         let mut chars = self.raw.chars().peekable();
-
+        let mut index = 0;
+        
         while let Some(c) = chars.next() {
+            eprintln!("DEBUG: index={}, char='{}' (U+{:04X})", index, c, c as u32);
+            index += 1;
             if c == '⟦' {
                 // Parse placeholder
-                let mut ph = String::new();
-                ph.push('⟦');
-
+                let mut ph_num = String::new();
+                chars.next(); // consume '⟦'
+                
+                eprintln!("DEBUG: after consuming ⟦, peek={:?}", chars.peek());
+                
                 while let Some(&next_c) = chars.peek() {
-                    ph.push(next_c);
                     chars.next();
+                    eprintln!("DEBUG: read char '{}' (U+{:04X}), ph_num='{}'", next_c, next_c as u32, ph_num);
                     if next_c == '⟧' {
                         break;
                     }
+                    ph_num.push(next_c);
                 }
-
-                if let Some(replacement) = self.placeholders.get(&ph[2..ph.len()-2]) {
+                
+                eprintln!("DEBUG: finished parsing placeholder, ph_num='{}'", ph_num);
+                
+                if let Some(replacement) = self.placeholders.get(&ph_num) {
+                    eprintln!("DEBUG RESTORE: found placeholder '{}' -> '{}'", ph_num, replacement);
                     if !replacement.is_empty() {
                         result.push_str(replacement);
                     }
                 } else {
-                    // Placeholder não encontrado - mantém como está para debug
-                    result.push_str(&ph);
+                    eprintln!("DEBUG: placeholder '{}' NOT FOUND (available: {:?})", ph_num, self.placeholders.keys().collect::<Vec<_>>());
+                    result.push('⟦');
+                    result.push_str(&ph_num);
+                    result.push('⟧');
                 }
             } else {
                 result.push(c);
             }
+            index += 1;
         }
 
         Ok(result)

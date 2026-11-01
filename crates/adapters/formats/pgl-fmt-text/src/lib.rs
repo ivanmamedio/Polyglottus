@@ -9,17 +9,17 @@ pub mod md;
 pub mod srt;
 pub mod vtt;
 // pub mod html_text;  // Desabilitado temporariamente - html5ever 0.26 API mudou
-// pub mod po;  // Temporarily disabled
-// pub mod xliff;  // Temporarily disabled
-// pub mod tmx;  // Temporarily disabled
-// pub mod json_i18n;  // Temporarily disabled
+pub mod po;
+pub mod xliff;
+pub mod tmx;
+pub mod json_i18n;
 
 use std::path::Path;
 use std::sync::Arc;
+use async_trait::async_trait;
 use pgl_app::{FormatReader, FormatWriter, FormatId, Confidence, FormatError, ExportOptions, ExportReport, TranslationLookup, OutputFormat, SourceDocument};
 use pgl_fmt_core::sniff_zip_format;
 
-type SourceDoc = Box<dyn SourceDocument + 'static>;
 
 /// Leitor TXT
 pub struct TxtReader;
@@ -30,6 +30,7 @@ impl TxtReader {
     }
 }
 
+#[async_trait]
 impl FormatReader for TxtReader {
     fn id(&self) -> FormatId {
         FormatId::TXT
@@ -51,7 +52,7 @@ impl FormatReader for TxtReader {
         }
     }
 
-    async fn open(&self, path: &Path) -> Result<SourceDoc, FormatError> {
+    async fn open(&self, path: &Path) -> Result<Box<dyn SourceDocument + 'static>, FormatError> {
         txt::open_txt(path).await
     }
 }
@@ -65,6 +66,7 @@ impl TxtWriter {
     }
 }
 
+#[async_trait]
 impl FormatWriter for TxtWriter {
     fn id(&self) -> FormatId {
         FormatId::TXT
@@ -98,6 +100,7 @@ impl MdReader {
     }
 }
 
+#[async_trait]
 impl FormatReader for MdReader {
     fn id(&self) -> FormatId {
         FormatId::MD
@@ -119,7 +122,7 @@ impl FormatReader for MdReader {
         }
     }
 
-    async fn open(&self, path: &Path) -> Result<SourceDoc, FormatError> {
+    async fn open(&self, path: &Path) -> Result<Box<dyn SourceDocument + 'static>, FormatError> {
         md::open_md(path).await
     }
 }
@@ -133,6 +136,7 @@ impl MdWriter {
     }
 }
 
+#[async_trait]
 impl FormatWriter for MdWriter {
     fn id(&self) -> FormatId {
         FormatId::MD
@@ -166,6 +170,7 @@ impl SrtReader {
     }
 }
 
+#[async_trait]
 impl FormatReader for SrtReader {
     fn id(&self) -> FormatId {
         FormatId::SRT
@@ -187,7 +192,7 @@ impl FormatReader for SrtReader {
         }
     }
 
-    async fn open(&self, path: &Path) -> Result<SourceDoc, FormatError> {
+    async fn open(&self, path: &Path) -> Result<Box<dyn SourceDocument + 'static>, FormatError> {
         srt::open_srt(path).await
     }
 }
@@ -201,6 +206,7 @@ impl SrtWriter {
     }
 }
 
+#[async_trait]
 impl FormatWriter for SrtWriter {
     fn id(&self) -> FormatId {
         FormatId::SRT
@@ -234,6 +240,7 @@ impl VttReader {
     }
 }
 
+#[async_trait]
 impl FormatReader for VttReader {
     fn id(&self) -> FormatId {
         FormatId::VTT
@@ -255,7 +262,7 @@ impl FormatReader for VttReader {
         }
     }
 
-    async fn open(&self, path: &Path) -> Result<SourceDoc, FormatError> {
+    async fn open(&self, path: &Path) -> Result<Box<dyn SourceDocument + 'static>, FormatError> {
         vtt::open_vtt(path).await
     }
 }
@@ -269,6 +276,7 @@ impl VttWriter {
     }
 }
 
+#[async_trait]
 impl FormatWriter for VttWriter {
     fn id(&self) -> FormatId {
         FormatId::VTT
@@ -293,73 +301,76 @@ impl FormatWriter for VttWriter {
     }
 }
 
-/// Leitor HTML (texto)
-pub struct HtmlTextReader;
-
-impl HtmlTextReader {
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl FormatReader for HtmlTextReader {
-    fn id(&self) -> FormatId {
-        FormatId::HTML
-    }
-
-    fn extensions(&self) -> &'static [&'static str] {
-        &[".html", ".htm", ".xhtml"]
-    }
-
-    fn sniff(&self, name: &str, head: &[u8]) -> Confidence {
-        let ext_match = name.ends_with(".html") || name.ends_with(".htm") || name.ends_with(".xhtml");
-        let html_match = head.windows(7).any(|w| w == b"<html") || head.windows(9).any(|w| w == b"<!DOCTYPE");
-
-        match (ext_match, html_match) {
-            (true, true) => Confidence::certain(),
-            (true, false) => Confidence::high(),
-            (false, true) => Confidence::medium(),
-            (false, false) => Confidence::none(),
-        }
-    }
-
-    async fn open(&self, path: &Path) -> Result<SourceDoc, FormatError> {
-        html_text::open_html(path).await
-    }
-}
-
-/// Writer HTML
-pub struct HtmlTextWriter;
-
-impl HtmlTextWriter {
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl FormatWriter for HtmlTextWriter {
-    fn id(&self) -> FormatId {
-        FormatId::HTML
-    }
-
-    async fn write(
-        &self,
-        source: &Path,
-        translations: &dyn TranslationLookup,
-        options: &ExportOptions,
-        out: &Path,
-    ) -> Result<ExportReport, FormatError> {
-        html_text::write_html(source, translations, options, out).await
-    }
-
-    fn supports_bilingual(&self) -> bool {
-        true
-    }
-
-    fn output_formats(&self) -> &'static [OutputFormat] {
-        &[OutputFormat::HTML]
-    }
-}
+// HTML (texto) - temporariamente desabilitado - html5ever 0.26 API mudou
+// /// Leitor HTML (texto)
+// pub struct HtmlTextReader;
+// 
+// impl HtmlTextReader {
+//     pub fn new() -> Self {
+//         Self
+//     }
+// }
+// 
+// #[async_trait]
+// impl FormatReader for HtmlTextReader {
+//     fn id(&self) -> FormatId {
+//         FormatId::HTML
+//     }
+// 
+//     fn extensions(&self) -> &'static [&'static str] {
+//         &[".html", ".htm", ".xhtml"]
+//     }
+// 
+//     fn sniff(&self, name: &str, head: &[u8]) -> Confidence {
+//         let ext_match = name.ends_with(".html") || name.ends_with(".htm") || name.ends_with(".xhtml");
+//         let html_match = head.windows(7).any(|w| w == b"<html") || head.windows(9).any(|w| w == b"<!DOCTYPE");
+// 
+//         match (ext_match, html_match) {
+//             (true, true) => Confidence::certain(),
+//             (true, false) => Confidence::high(),
+//             (false, true) => Confidence::medium(),
+//             (false, false) => Confidence::none(),
+//         }
+//     }
+// 
+//     async fn open(&self, path: &Path) -> Result<Box<dyn SourceDocument + 'static>, FormatError> {
+//         html_text::open_html(path).await
+//     }
+// }
+// 
+// /// Writer HTML
+// pub struct HtmlTextWriter;
+// 
+// impl HtmlTextWriter {
+//     pub fn new() -> Self {
+//         Self
+//     }
+// }
+// 
+// #[async_trait]
+// impl FormatWriter for HtmlTextWriter {
+//     fn id(&self) -> FormatId {
+//         FormatId::HTML
+//     }
+// 
+//     async fn write(
+//         &self,
+//         source: &Path,
+//         translations: &dyn TranslationLookup,
+//         options: &ExportOptions,
+//         out: &Path,
+//     ) -> Result<ExportReport, FormatError> {
+//         html_text::write_html(source, translations, options, out).await
+//     }
+// 
+//     fn supports_bilingual(&self) -> bool {
+//         true
+//     }
+// 
+//     fn output_formats(&self) -> &'static [OutputFormat] {
+//         &[OutputFormat::HTML]
+//     }
+// }
 
 /// Leitor PO (gettext)
 pub struct PoReader;
@@ -370,6 +381,7 @@ impl PoReader {
     }
 }
 
+#[async_trait]
 impl FormatReader for PoReader {
     fn id(&self) -> FormatId {
         FormatId::PO
@@ -391,7 +403,7 @@ impl FormatReader for PoReader {
         }
     }
 
-    async fn open(&self, path: &Path) -> Result<SourceDoc, FormatError> {
+    async fn open(&self, path: &Path) -> Result<Box<dyn SourceDocument + 'static>, FormatError> {
         po::open_po(path).await
     }
 }
@@ -405,6 +417,7 @@ impl PoWriter {
     }
 }
 
+#[async_trait]
 impl FormatWriter for PoWriter {
     fn id(&self) -> FormatId {
         FormatId::PO
@@ -438,6 +451,7 @@ impl XliffReader {
     }
 }
 
+#[async_trait]
 impl FormatReader for XliffReader {
     fn id(&self) -> FormatId {
         FormatId::XLIFF
@@ -459,7 +473,7 @@ impl FormatReader for XliffReader {
         }
     }
 
-    async fn open(&self, path: &Path) -> Result<SourceDoc, FormatError> {
+    async fn open(&self, path: &Path) -> Result<Box<dyn SourceDocument + 'static>, FormatError> {
         xliff::open_xliff(path).await
     }
 }
@@ -473,6 +487,7 @@ impl XliffWriter {
     }
 }
 
+#[async_trait]
 impl FormatWriter for XliffWriter {
     fn id(&self) -> FormatId {
         FormatId::XLIFF
@@ -506,6 +521,7 @@ impl TmxReader {
     }
 }
 
+#[async_trait]
 impl FormatReader for TmxReader {
     fn id(&self) -> FormatId {
         FormatId::TMX
@@ -527,7 +543,7 @@ impl FormatReader for TmxReader {
         }
     }
 
-    async fn open(&self, path: &Path) -> Result<SourceDoc, FormatError> {
+    async fn open(&self, path: &Path) -> Result<Box<dyn SourceDocument + 'static>, FormatError> {
         tmx::open_tmx(path).await
     }
 }
@@ -541,6 +557,7 @@ impl TmxWriter {
     }
 }
 
+#[async_trait]
 impl FormatWriter for TmxWriter {
     fn id(&self) -> FormatId {
         FormatId::TMX
@@ -574,6 +591,7 @@ impl JsonI18nReader {
     }
 }
 
+#[async_trait]
 impl FormatReader for JsonI18nReader {
     fn id(&self) -> FormatId {
         FormatId::JSON_I18N
@@ -595,7 +613,7 @@ impl FormatReader for JsonI18nReader {
         }
     }
 
-    async fn open(&self, path: &Path) -> Result<SourceDoc, FormatError> {
+    async fn open(&self, path: &Path) -> Result<Box<dyn SourceDocument + 'static>, FormatError> {
         json_i18n::open_json_i18n(path).await
     }
 }
@@ -609,6 +627,7 @@ impl JsonI18nWriter {
     }
 }
 
+#[async_trait]
 impl FormatWriter for JsonI18nWriter {
     fn id(&self) -> FormatId {
         FormatId::JSON_I18N
@@ -645,7 +664,7 @@ mod tests {
         let _ = MdReader::new();
         let _ = SrtReader::new();
         let _ = VttReader::new();
-        let _ = HtmlTextReader::new();
+        // let _ = HtmlTextReader::new();  // HTML temporarily disabled
         let _ = PoReader::new();
         let _ = XliffReader::new();
         let _ = TmxReader::new();
@@ -658,7 +677,7 @@ mod tests {
         let _ = MdWriter::new();
         let _ = SrtWriter::new();
         let _ = VttWriter::new();
-        let _ = HtmlTextWriter::new();
+        // let _ = HtmlTextWriter::new();  // HTML temporarily disabled
         let _ = PoWriter::new();
         let _ = XliffWriter::new();
         let _ = TmxWriter::new();
