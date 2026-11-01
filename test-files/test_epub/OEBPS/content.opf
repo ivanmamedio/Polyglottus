@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<package version="3.0" xmlns="http://www.idpf.org/2007/opf" unique-id="bookid">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:identifier id="bookid">test-book-001</dc:identifier>
+    <dc:title>Livro de Teste</dc:title>
+    <dc:language>en</dc:language>
+    <dc:creator>Autor de Teste</dc:creator>
+  </metadata>
+  <manifest>
+    <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
+    <item id="ch1" href="chapter1.xhtml" media-type="application/xhtml+xml"/>
+  </manifest>
+  <spine>
+    <itemref idref="ch1"/>
+  </spine>
+</package>
