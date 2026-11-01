@@ -7,7 +7,7 @@ license = "MIT OR Apache-2.0"
 
 [dependencies]
 pgl-fmt-core = { workspace = true }
-pgl-fmt-patch = { workspace = true }
+# pgl-fmt-patch = { workspace = true }
 pgl-app = { workspace = true }
 pgl-domain = { workspace = true }
 epub = "2"
