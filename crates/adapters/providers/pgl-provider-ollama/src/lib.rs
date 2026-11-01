@@ -87,7 +87,7 @@ impl OllamaProvider {
         }
 
         if let Some(ctx) = &req.context {
-            parts.push(&format!("\nContext: {}", ctx));
+            parts.push(format!("\nContext: {}", ctx));
         }
 
         parts.push("\nSegments to translate:".into());
@@ -223,12 +223,12 @@ impl TranslationProvider for OllamaProvider {
             .map_err(|e| ProviderError::Provider(format!("Invalid JSON: {}", e)))?;
 
         Ok(tags_resp.models.into_iter().map(|m| ModelInfo {
-            id: m.name,
+            id: m.name.clone(),
             name: m.name,
             languages: vec![Language::new("en")],
             max_context: 8192,
             is_local: true,
-            size_gb: Some(m.size as f64 / 1_000_000_000.0),
+            size_gb: Some((m.size as f64 / 1_000_000_000.0) as f32),
             license: None,
         }).collect())
     }
