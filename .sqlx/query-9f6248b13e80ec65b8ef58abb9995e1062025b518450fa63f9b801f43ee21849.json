@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO jobs (id, project_id, config, state, progress, fidelity_report, export_options, export_report, created_at, updated_at, started_at, completed_at)\n            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)\n            ON CONFLICT(id) DO UPDATE SET\n                config = excluded.config,\n                state = excluded.state,\n                progress = excluded.progress,\n                fidelity_report = excluded.fidelity_report,\n                export_options = excluded.export_options,\n                export_report = excluded.export_report,\n                updated_at = excluded.updated_at,\n                started_at = excluded.started_at,\n                completed_at = excluded.completed_at\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 12
+    },
+    "nullable": []
+  },
+  "hash": "9f6248b13e80ec65b8ef58abb9995e1062025b518450fa63f9b801f43ee21849"
+}

@@ -1,0 +1,80 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id, config, state, progress, fidelity_report, export_options, export_report, created_at, updated_at, started_at, completed_at FROM jobs WHERE id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "config",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "state",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "progress",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "fidelity_report",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "export_options",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "export_report",
+        "ordinal": 6,
+        "type_info": "Text"
+      },
+      {
+        "name": "created_at",
+        "ordinal": 7,
+        "type_info": "Integer"
+      },
+      {
+        "name": "updated_at",
+        "ordinal": 8,
+        "type_info": "Integer"
+      },
+      {
+        "name": "started_at",
+        "ordinal": 9,
+        "type_info": "Integer"
+      },
+      {
+        "name": "completed_at",
+        "ordinal": 10,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      true,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "9066514dca3ce4e561360c8cb79a857194bb54e198965e90ec2f8b8851cc8cc2"
+}

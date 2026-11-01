@@ -15,7 +15,7 @@ zip = { workspace = true }
 quick-xml = { workspace = true }
 thiserror = { workspace = true }
 anyhow = { workspace = true }
-serde = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
 mime_guess = "2.0"
 md5 = { workspace = true }
 html5ever = { workspace = true }

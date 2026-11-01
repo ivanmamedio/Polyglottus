@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE units SET translation = ?, qa_warnings = ? WHERE id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "058bf4ac696d48a17008b4cda195c5431ef0f9a830d7a3e6bfd2319063702962"
+}

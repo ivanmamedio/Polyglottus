@@ -12,10 +12,8 @@ pub mod calibre;
 pub mod libreoffice;
 
 use std::path::Path;
-use std::pin::Pin;
-use std::future::Future;
+use async_trait::async_trait;
 use pgl_app::{FormatReader, FormatWriter, FormatId, Confidence, FormatError, ExportOptions, ExportReport, TranslationLookup, SourceDocument, AssetRef, DocumentMetadata, OutputFormat};
-use pgl_domain::{Unit, UnitId, UnitKind, SectionId, MarkedText, Language};
 use pgl_fmt_core::{ZipFormatReader, ZipFormatWriter, ZipSourceDocument, make_source_ref, default_zip_fidelity, sniff_zip_format};
 use zip::ZipArchive;
 
@@ -103,19 +101,35 @@ impl ConvertFormat {
 }
 
 /// Tipos de conversores disponíveis
-#[derive(Debug, Clone, Copy)]
-pub enum Converter {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ConverterType {
     Pandoc,
     Calibre,
     LibreOffice,
 }
 
-impl Converter {
+impl ConverterType {
     pub fn format_id(&self) -> FormatId {
         match self {
-            Converter::Pandoc => FormatId("pandoc"),
-            Converter::Calibre => FormatId("calibre"),
-            Converter::LibreOffice => FormatId("libreoffice"),
+            ConverterType::Pandoc => FormatId("pandoc"),
+            ConverterType::Calibre => FormatId("calibre"),
+            ConverterType::LibreOffice => FormatId("libreoffice"),
+        }
+    }
+
+    pub fn extensions(&self) -> &'static [&'static str] {
+        match self {
+            ConverterType::Pandoc => pandoc::PandocConverter::extensions(),
+            ConverterType::Calibre => calibre::CalibreConverter::extensions(),
+            ConverterType::LibreOffice => libreoffice::LibreOfficeConverter::extensions(),
+        }
+    }
+
+    pub fn sniff(&self, name: &str) -> Confidence {
+        match self {
+            ConverterType::Pandoc => pandoc::PandocConverter::sniff_static(name),
+            ConverterType::Calibre => calibre::CalibreConverter::sniff_static(name),
+            ConverterType::LibreOffice => libreoffice::LibreOfficeConverter::sniff_static(name),
         }
     }
 }
@@ -155,14 +169,6 @@ impl Default for ConverterRegistry {
     }
 }
 
-/// Tipos de conversores disponíveis
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum ConverterType {
-    Pandoc,
-    Calibre,
-    LibreOffice,
-}
-
 /// Wrapper para usar conversores com FormatReader
 pub struct ConvertReader {
     converter_type: ConverterType,
@@ -174,36 +180,22 @@ impl ConvertReader {
     }
 }
 
+#[async_trait]
 impl FormatReader for ConvertReader {
     fn id(&self) -> FormatId {
-        match self.converter_type {
-            ConverterType::Pandoc => FormatId("pandoc"),
-            ConverterType::Calibre => FormatId("calibre"),
-            ConverterType::LibreOffice => FormatId("libreoffice"),
-        }
+        self.converter_type.format_id()
     }
 
     fn extensions(&self) -> &'static [&'static str] {
-        match self.converter_type {
-            ConverterType::Pandoc => pandoc::PandocConverter::extensions(),
-            ConverterType::Calibre => calibre::CalibreConverter::extensions(),
-            ConverterType::LibreOffice => libreoffice::LibreOfficeConverter::extensions(),
-        }
+        self.converter_type.extensions()
     }
 
     fn sniff(&self, name: &str, _head: &[u8]) -> Confidence {
-        match self.converter_type {
-            ConverterType::Pandoc => pandoc::PandocConverter::sniff_static(name),
-            ConverterType::Calibre => calibre::CalibreConverter::sniff_static(name),
-            ConverterType::LibreOffice => libreoffice::LibreOfficeConverter::sniff_static(name),
-        }
+        self.converter_type.sniff(name)
     }
 
-    fn open(&self, path: &Path) -> Pin<Box<dyn Future<Output = Result<Box<dyn SourceDocument + 'static>, FormatError>> + Send + '_>> {
-        let converter_type = self.converter_type;
-        Box::pin(async move {
-            Err(FormatError::ParseError(format!("Converter not implemented: {:?}", converter_type)))
-        })
+    async fn open(&self, path: &Path) -> Result<Box<dyn SourceDocument + 'static>, FormatError> {
+        Err(FormatError::ParseError(format!("Converter not implemented: {:?}", self.converter_type)))
     }
 }
 
@@ -217,14 +209,10 @@ impl ConvertWriter {
     }
 }
 
-#[async_trait::async_trait]
+#[async_trait]
 impl FormatWriter for ConvertWriter {
     fn id(&self) -> FormatId {
-        match self.converter_type {
-            ConverterType::Pandoc => FormatId("pandoc"),
-            ConverterType::Calibre => FormatId("calibre"),
-            ConverterType::LibreOffice => FormatId("libreoffice"),
-        }
+        self.converter_type.format_id()
     }
 
     async fn write(
@@ -239,13 +227,6 @@ impl FormatWriter for ConvertWriter {
 
     fn supports_bilingual(&self) -> bool { false }
     fn output_formats(&self) -> &'static [OutputFormat] { &[OutputFormat::SameAsSource] }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum ConverterType {
-    Pandoc,
-    Calibre,
-    LibreOffice,
 }
 
 /// Registry de conversores

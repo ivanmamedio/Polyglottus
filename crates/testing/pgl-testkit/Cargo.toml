@@ -9,7 +9,7 @@ license = "MIT OR Apache-2.0"
 pgl-app = { workspace = true }
 pgl-domain = { workspace = true }
 async-trait = { workspace = true }
-serde = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
 tokio = { workspace = true }
 tracing = { workspace = true }
 uuid = { workspace = true }

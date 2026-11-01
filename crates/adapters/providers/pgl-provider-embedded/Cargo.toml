@@ -11,7 +11,7 @@ pgl-domain = { workspace = true }
 llama-cpp-2 = { workspace = true }
 async-trait = { workspace = true }
 thiserror = { workspace = true }
-serde = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }

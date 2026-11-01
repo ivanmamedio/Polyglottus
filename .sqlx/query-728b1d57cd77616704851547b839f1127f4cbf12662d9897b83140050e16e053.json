@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO projects (id, name, source_file, source_format, detected_language, fidelity_report, export_options, created_at, updated_at, metadata)\n            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)\n            ON CONFLICT(id) DO UPDATE SET\n                name = excluded.name,\n                source_file = excluded.source_file,\n                source_format = excluded.source_format,\n                detected_language = excluded.detected_language,\n                fidelity_report = excluded.fidelity_report,\n                export_options = excluded.export_options,\n                updated_at = excluded.updated_at,\n                metadata = excluded.metadata\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 10
+    },
+    "nullable": []
+  },
+  "hash": "728b1d57cd77616704851547b839f1127f4cbf12662d9897b83140050e16e053"
+}

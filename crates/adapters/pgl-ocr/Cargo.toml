@@ -14,7 +14,7 @@ tesseract = { version = "0.3", optional = true }
 image = "0.24"
 async-trait = { workspace = true }
 thiserror = { workspace = true }
-serde = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
 tokio = { workspace = true }
 tracing = { workspace = true }
 

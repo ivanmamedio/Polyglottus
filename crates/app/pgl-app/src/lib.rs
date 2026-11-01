@@ -15,6 +15,7 @@ use std::sync::Arc;
 use pgl_domain::prelude::*;
 use pgl_domain::unit::PlaceholderError;
 use uuid::Uuid;
+use serde::{Serialize, Deserialize};
 
 /// Erros da camada de aplicação
 #[derive(Debug, thiserror::Error)]
@@ -464,6 +465,15 @@ pub struct GpuInfo {
     pub vulkan: bool,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum QualityTier {
+    Draft,
+    Good,
+    High,
+    Premium,
+}
+
 /// Recomendação de modelo
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ModelRecommendation {
@@ -474,15 +484,6 @@ pub struct ModelRecommendation {
     pub quality_tier: QualityTier,
     pub download_size_gb: f32,
     pub license: String,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum QualityTier {
-    Draft,
-    Good,
-    High,
-    Premium,
 }
 
 /// Erro de modelos

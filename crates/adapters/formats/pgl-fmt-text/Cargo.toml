@@ -14,7 +14,7 @@ scraper = { workspace = true }
 quick-xml = { workspace = true }
 thiserror = { workspace = true }
 anyhow = { workspace = true }
-serde = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 pulldown-cmark = "0.10"
 comrak = { version = "0.20", features = ["default"] }

@@ -13,7 +13,7 @@ zip = { workspace = true }
 quick-xml = { workspace = true }
 thiserror = { workspace = true }
 anyhow = { workspace = true }
-serde = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
 async-trait = { workspace = true }
 
 [dev-dependencies]

@@ -1,0 +1,86 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id, name, source_file, source_format, detected_language, fidelity_report, export_options, created_at, updated_at, metadata, global_glossary, global_style_guide FROM projects WHERE id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "name",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "source_file",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "source_format",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "detected_language",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "fidelity_report",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "export_options",
+        "ordinal": 6,
+        "type_info": "Text"
+      },
+      {
+        "name": "created_at",
+        "ordinal": 7,
+        "type_info": "Integer"
+      },
+      {
+        "name": "updated_at",
+        "ordinal": 8,
+        "type_info": "Integer"
+      },
+      {
+        "name": "metadata",
+        "ordinal": 9,
+        "type_info": "Text"
+      },
+      {
+        "name": "global_glossary",
+        "ordinal": 10,
+        "type_info": "Text"
+      },
+      {
+        "name": "global_style_guide",
+        "ordinal": 11,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      true,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "96b2de6b0eebfc2164573bf50a8f524d1826048af7a3e4d828f6511964ceecbc"
+}

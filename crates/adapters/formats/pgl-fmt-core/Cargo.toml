@@ -15,7 +15,7 @@ scraper = { workspace = true }
 thiserror = { workspace = true }
 walkdir = { workspace = true }
 mime_guess = { workspace = true }
-serde = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
 hex = { workspace = true }
 anyhow = { workspace = true }
 

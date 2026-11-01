@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO units (id, job_id, source_ref, kind, text, section, state, translation, qa_warnings, retry_count, metadata)\n            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)\n            ON CONFLICT(id) DO UPDATE SET\n                source_ref = excluded.source_ref,\n                kind = excluded.kind,\n                text = excluded.text,\n                section = excluded.section,\n                state = excluded.state,\n                translation = excluded.translation,\n                qa_warnings = excluded.qa_warnings,\n                retry_count = excluded.retry_count,\n                metadata = excluded.metadata\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 11
+    },
+    "nullable": []
+  },
+  "hash": "ebd24900517acfcae2c5953e9af31dd28bf3ac6d37ca006c1dd550915ab29791"
+}

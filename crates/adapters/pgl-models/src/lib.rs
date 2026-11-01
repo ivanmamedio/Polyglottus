@@ -18,7 +18,10 @@ use std::path::{Path, PathBuf};
 use std::collections::HashMap;
 use sysinfo::{System, CpuExt, DiskExt};
 use tokio::fs;
+use tokio::io::AsyncWriteExt;
 use tracing::{info, debug, warn};
+use sha2::{Sha256, Digest};
+use futures_util::StreamExt;
 
 /// Catálogo de modelos
 pub struct ModelCatalogImpl {
@@ -79,7 +82,7 @@ impl ModelCatalogImpl {
         let client = Client::builder()
             .timeout(std::time::Duration::from_secs(30))
             .build()
-            .map_err(|e| ModelsErrors::Io(e.into()))?;
+            .map_err(|e| ModelsError::Io(e.into()))?;
 
         std::fs::create_dir_all(&config.models_dir)?;
 
@@ -151,7 +154,7 @@ impl ModelCatalogImpl {
         })
     }
 
-    fn detect_gpu(&self, sys: &mut System) -> Option<GpuInfo> {
+    fn detect_gpu(&self, _sys: &mut System) -> Option<GpuInfo> {
         // sysinfo tem suporte limitado a GPU
         // Em produção, usar bibliotecas específicas (nvml, metal, vulkan)
         None
@@ -254,6 +257,7 @@ impl ModelCatalog for ModelCatalogImpl {
         let mut stream = response.bytes_stream();
 
         use futures_util::StreamExt;
+        let mut stream = std::pin::pin!(stream);
         while let Some(chunk) = stream.next().await {
             let chunk = chunk.map_err(|e| ModelsError::DownloadFailed(e.to_string()))?;
             file.write_all(&chunk).await?;
@@ -272,7 +276,7 @@ impl ModelCatalog for ModelCatalogImpl {
         self.get_model_info(model_id).await
     }
 
-    async fn verify_checksum(&self, path: &Path, expected: &str) -> Result<(), ModelsError> {
+    pub async fn verify_checksum(&self, path: &Path, expected: &str) -> Result<(), ModelsError> {
         use sha2::{Sha256, Digest};
         let content = fs::read(path).await?;
         let mut hasher = Sha256::new();
@@ -300,12 +304,12 @@ impl ModelCatalog for ModelCatalogImpl {
         Ok(models)
     }
 
-    async fn get_model_info(&self, model_id: &str) -> Result<ModelInfo, ModelsError> {
+    pub async fn get_model_info(&self, model_id: &str) -> Result<ModelInfo, ModelsError> {
         let path = self.models_dir.join(format!("{}.gguf", model_id));
         self.get_model_info_from_file(&path).await
     }
 
-    async fn get_model_info_from_file(&self, path: &Path) -> Result<ModelInfo, ModelsError> {
+    pub async fn get_model_info_from_file(&self, path: &Path) -> Result<ModelInfo, ModelsError> {
         let metadata = fs::metadata(path).await?;
         let name = path.file_stem().unwrap().to_string_lossy().to_string();
 
@@ -315,7 +319,7 @@ impl ModelCatalog for ModelCatalogImpl {
         Ok(ModelInfo {
             id: name.clone(),
             name,
-            languages: entry.map(|e| e.languages.clone()).unwrap_or_default(),
+            languages: entry.map(|e| e.languages.iter().map(|s| Language::new(s)).collect()).unwrap_or_default(),
             max_context: 8192,
             is_local: true,
             size_gb: Some((metadata.len() as f64 / (1024.0 * 1024.0 * 1024.0)) as f32),

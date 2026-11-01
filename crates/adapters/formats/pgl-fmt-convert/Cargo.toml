@@ -11,9 +11,11 @@ pgl-app = { workspace = true }
 pgl-domain = { workspace = true }
 thiserror = { workspace = true }
 anyhow = { workspace = true }
-serde = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
 tokio = { workspace = true }
 which = "5.0"
+async-trait = { workspace = true }
+zip = { workspace = true }
 
 [dev-dependencies]
 insta = { workspace = true }
