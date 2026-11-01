@@ -4,8 +4,8 @@ members = [
     "crates/domain/pgl-domain",
     "crates/app/pgl-app",
     "crates/adapters/formats/pgl-fmt-core",
-    # "crates/adapters/formats/pgl-fmt-patch",
-    # "crates/adapters/formats/pgl-fmt-epub",
+    "crates/adapters/formats/pgl-fmt-patch",
+    "crates/adapters/formats/pgl-fmt-epub",
     # "crates/adapters/formats/pgl-fmt-ooxml",
     # "crates/adapters/formats/pgl-fmt-odf",
     "crates/adapters/formats/pgl-fmt-text",
@@ -40,8 +40,8 @@ async-trait = "0.1"
 pgl-domain = { path = "crates/domain/pgl-domain" }
 pgl-app = { path = "crates/app/pgl-app" }
 pgl-fmt-core = { path = "crates/adapters/formats/pgl-fmt-core" }
-# pgl-fmt-patch = { path = "crates/adapters/formats/pgl-fmt-patch" }
-# pgl-fmt-epub = { path = "crates/adapters/formats/pgl-fmt-epub" }
+pgl-fmt-patch = { path = "crates/adapters/formats/pgl-fmt-patch" }
+pgl-fmt-epub = { path = "crates/adapters/formats/pgl-fmt-epub" }
 pgl-fmt-ooxml = { path = "crates/adapters/formats/pgl-fmt-ooxml" }
 pgl-fmt-odf = { path = "crates/adapters/formats/pgl-fmt-odf" }
 pgl-fmt-text = { path = "crates/adapters/formats/pgl-fmt-text" }

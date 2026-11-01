@@ -2,12 +2,11 @@
 name = "pgl-fmt-epub"
 version = "0.1.0"
 edition = "2021"
-description = "Adaptador EPUB (leitura e escrita via patch engine)"
+description = "Adaptador EPUB (leitura e escrita)"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
 pgl-fmt-core = { workspace = true }
-# pgl-fmt-patch = { workspace = true }
 pgl-app = { workspace = true }
 pgl-domain = { workspace = true }
 epub = "2"
@@ -16,6 +15,11 @@ quick-xml = { workspace = true }
 thiserror = { workspace = true }
 anyhow = { workspace = true }
 serde = { workspace = true }
+serde_json = { workspace = true }
+mime_guess = "2.0"
+md5 = { workspace = true }
+async-trait = { workspace = true }
+tokio = { workspace = true }
 
 [dev-dependencies]
 insta = { workspace = true }

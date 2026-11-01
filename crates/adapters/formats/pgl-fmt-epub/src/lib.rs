@@ -1,64 +1,124 @@
-//! Adaptador EPUB completo (leitura e escrita)
+//! Adaptador EPUB (leitura)
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 #![warn(clippy::all, clippy::pedantic, clippy::nursery, clippy::cargo)]
 
 use std::path::Path;
-use std::sync::Arc;
-use pgl_app::{FormatReader, FormatWriter, FormatId, Confidence, FormatError, ExportOptions, ExportReport, TranslationLookup, SourceDocument, AssetRef, FidelityReport, DocumentMetadata, OutputFormat};
-use pgl_domain::{Unit, UnitId, UnitKind, SectionId, MarkedText, SourceRef, Language};
-use pgl_fmt_core::{ZipFormatReader, ZipFormatWriter, ZipSourceDocument, make_unit_id, make_source_ref, make_section_id, default_zip_fidelity, sniff_zip_format};
-use pgl_fmt_patch::{PatchEngine, EpubScanner, EpubReader as PatchEpubReader, EpubWriter as PatchEpubWriter, OpcPackage};
+use async_trait::async_trait;
+use pgl_app::{FormatReader, FormatWriter, FormatId, Confidence, FormatError, ExportOptions, ExportReport, TranslationLookup, SourceDocument, AssetRef, DocumentMetadata, OutputFormat};
+use pgl_domain::{Unit, UnitId, UnitKind, SectionId, MarkedText, Language};
+use pgl_fmt_core::{ZipFormatReader, ZipFormatWriter, ZipSourceDocument, make_source_ref, default_zip_fidelity, sniff_zip_format};
 use epub::doc::EpubDoc;
+use zip::ZipArchive;
 
-/// Leitor EPUB (usa epub crate para parsing robusto + patch engine para unidades)
-pub struct EpubReader {
-    patch_reader: PatchEpubReader,
-}
+/// Leitor EPUB (usa epub crate para parsing robusto)
+pub struct EpubReader;
 
 impl EpubReader {
     pub fn new() -> Self {
-        Self { patch_reader: PatchEpubReader::new() }
+        Self
     }
 }
 
+#[async_trait]
 impl FormatReader for EpubReader {
     fn id(&self) -> FormatId {
         FormatId::EPUB
     }
 
-    fn sniff(&self, name: &str, head: &[u8]) -> Confidence {
+    fn extensions(&self) -> &'static [&'static str] {
+        &[".epub"]
+    }
+
+    fn sniff(&self, name: &str, _head: &[u8]) -> Confidence {
         sniff_zip_format(Path::new(name), &[".epub"])
     }
 
-    async fn open(&self, path: &Path) -> Result<Box<dyn SourceDocument>, FormatError> {
+    async fn open(&self, path: &Path) -> Result<Box<dyn SourceDocument + 'static>, FormatError> {
         // Usa epub crate para extrair metadados e estrutura
         let mut doc = EpubDoc::new(path)
             .map_err(|e| FormatError::ParseError(e.to_string()))?;
 
-        let mut package = OpcPackage::open(path)?;
-
-        // Scanner EPUB
-        let scanner = EpubScanner;
-        let locations = scanner.scan(&package)?;
-
-        // Converte para unidades do domínio
+        // Extrai o spine (ordem de leitura)
+        let spine = doc.spine.iter().map(|item| item.idref.clone()).collect::<Vec<_>>();
+        
         let mut units = Vec::new();
-        for loc in locations {
-            let source_ref = make_source_ref(&loc.file_path, &loc.xpath);
-            let mut unit = Unit::new(
-                source_ref,
-                loc.kind,
-                MarkedText::new(&loc.original_text),
-                loc.section,
-            );
-            unit.id = loc.unit_id;
-            units.push(unit);
+        let section = SectionId::new();
+        let mut global_idx = 0;
+
+        // Processa cada item do spine
+        // Collect resource data first to avoid borrow issues
+        let spine_resources: Vec<(String, String)> = spine.iter()
+            .filter_map(|idref| {
+                doc.get_resource_str(idref).map(|(content, _)| (idref.clone(), content))
+            })
+            .collect();
+
+        // Processa cada item do spine
+        for (spine_idx, (idref, content)) in spine_resources.iter().enumerate() {
+            // Encontra o item no manifest
+            let manifest_item = doc.resources.get(idref);
+            if manifest_item.is_none() {
+                continue;
+            }
+            let manifest_item = manifest_item.unwrap();
+            
+            // Extrai texto simples (remove tags HTML básicas)
+            let text = extract_text_from_html(&content);
+            
+            if text.trim().is_empty() {
+                continue;
+            }
+
+            // Divide em parágrafos
+            let paragraphs: Vec<&str> = text.split("\n\n")
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty() && s.len() > 10)
+                .collect();
+
+            for (para_idx, para) in paragraphs.iter().copied().enumerate() {
+                let unit_id = UnitId::new();
+                let source_ref = make_source_ref(&manifest_item.path.to_string_lossy(), &format!("paragraph[{}]", para_idx));
+                let mut unit = Unit::new(source_ref, UnitKind::Paragraph, MarkedText::new(para), section);
+                unit.id = unit_id;
+                unit.metadata.insert("spine_index".into(), serde_json::Value::Number(spine_idx.into()));
+                unit.metadata.insert("resource_id".into(), serde_json::Value::String(idref.clone()));
+                unit.metadata.insert("global_index".into(), serde_json::Value::Number(global_idx.into()));
+                units.push(unit);
+                global_idx += 1;
+            }
         }
 
         // Assets (imagens, CSS, fontes)
-        let assets = self.extract_assets(&mut package)?;
+        let mut assets = Vec::new();
+        // Collect resource data first to avoid borrow issues
+        let resources: Vec<_> = doc.resources.iter()
+            .map(|(id, resource)| (id.clone(), resource.clone()))
+            .collect();
+        
+        for (id, resource) in resources {
+            let path_str = resource.path.to_string_lossy();
+            if path_str.ends_with(".xml") || path_str.ends_with(".xhtml") || 
+               path_str.ends_with(".opf") || path_str.ends_with(".ncx") {
+                continue;
+            }
+
+            let resource_data = doc.get_resource(&id)
+                .map(|(data, _)| data)
+                .unwrap_or_default();
+            
+            let mime = mime_guess::from_path(&resource.path).first_or_octet_stream();
+            let hash = format!("{:x}", md5::compute(&resource_data));
+
+            assets.push(AssetRef {
+                id: hash.clone(),
+                internal_path: path_str.to_string(),
+                mime_type: mime.to_string(),
+                size: resource_data.len() as u64,
+                hash,
+            });
+        }
 
         // Fidelidade
         let fidelity = default_zip_fidelity()
@@ -72,19 +132,19 @@ impl FormatReader for EpubReader {
 
         // Metadados
         let metadata = DocumentMetadata {
-            title: doc.mdata("title").map(|s| s.to_string()),
-            author: doc.mdata("creator").map(|s| s.to_string()),
-            language: doc.mdata("language").map(|s| Language::new(s)),
-            subject: doc.mdata("subject").map(|s| s.to_string()),
-            description: doc.mdata("description").map(|s| s.to_string()),
+            title: doc.mdata("title").map(|s| s.value.clone()),
+            author: doc.mdata("creator").map(|s| s.value.clone()),
+            language: doc.mdata("language").map(|s| Language::new(&s.value)),
+            subject: doc.mdata("subject").map(|s| s.value.clone()),
+            description: doc.mdata("description").map(|s| s.value.clone()),
             ..Default::default()
         };
 
         // Archive vazio (não usado para leitura streaming)
-        let archive = zip::ZipArchive::new(std::io::Cursor::new(Vec::new()))?;
+        let empty_archive = ZipArchive::new(std::io::Cursor::new(Vec::new())).unwrap();
 
         Ok(Box::new(ZipSourceDocument::new(
-            archive,
+            empty_archive,
             units,
             assets,
             fidelity,
@@ -93,31 +153,58 @@ impl FormatReader for EpubReader {
     }
 }
 
-impl EpubReader {
-    fn extract_assets(&self, package: &mut OpcPackage) -> Result<Vec<AssetRef>, FormatError> {
-        let mut assets = Vec::new();
-
-        for (name, content) in &package.parts {
-            // Skip XML content files
-            if name.ends_with(".xml") || name.ends_with(".xhtml") || name.ends_with(".opf") || name.ends_with(".ncx") {
-                continue;
+/// Extrai texto simples de HTML (remove tags)
+fn extract_text_from_html(html: &str) -> String {
+    let mut text = String::new();
+    let mut in_tag = false;
+    let mut tag_buffer = String::new();
+    
+    for c in html.chars() {
+        match c {
+            '<' => {
+                in_tag = true;
+                tag_buffer.clear();
+                tag_buffer.push('<');
             }
-
-            // Assets: imagens, CSS, fontes
-            let mime = mime_guess::from_path(name).first_or_octet_stream();
-            let hash = format!("{:x}", md5::compute(content));
-
-            assets.push(AssetRef {
-                id: hash.clone(),
-                internal_path: name.clone(),
-                mime_type: mime.to_string(),
-                size: content.len() as u64,
-                hash,
-            });
+            '>' if in_tag => {
+                in_tag = false;
+                tag_buffer.push('>');
+                // Handle some common tags
+                let tag_lower = tag_buffer.to_lowercase();
+                if tag_lower == "<br>" || tag_lower == "<br/>" || tag_lower == "</p>" || 
+                   tag_lower == "<br />" || tag_lower == "</div>" {
+                    text.push('\n');
+                } else if tag_lower == "<p>" || tag_lower.starts_with("<h") {
+                    text.push_str("\n\n");
+                }
+            }
+            _ if in_tag => {
+                tag_buffer.push(c);
+            }
+            _ => {
+                text.push(c);
+            }
         }
-
-        Ok(assets)
     }
+    
+    // Clean up multiple newlines
+    let mut result = String::new();
+    let mut prev_was_newline = false;
+    for line in text.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            if !prev_was_newline {
+                result.push('\n');
+                prev_was_newline = true;
+            }
+        } else {
+            result.push_str(trimmed);
+            result.push('\n');
+            prev_was_newline = false;
+        }
+    }
+    
+    result
 }
 
 impl ZipFormatReader for EpubReader {
@@ -134,17 +221,16 @@ impl ZipFormatReader for EpubReader {
     }
 }
 
-/// Writer EPUB (patch no lugar)
-pub struct EpubWriter {
-    patch_writer: PatchEpubWriter,
-}
+/// Writer EPUB (placeholder - EPUB writing is complex and requires zip manipulation)
+pub struct EpubWriter;
 
 impl EpubWriter {
     pub fn new() -> Self {
-        Self { patch_writer: PatchEpubWriter::new() }
+        Self
     }
 }
 
+#[async_trait]
 impl FormatWriter for EpubWriter {
     fn id(&self) -> FormatId {
         FormatId::EPUB
@@ -152,32 +238,17 @@ impl FormatWriter for EpubWriter {
 
     async fn write(
         &self,
-        source: &Path,
-        translations: &dyn TranslationLookup,
-        options: &ExportOptions,
-        out: &Path,
+        _source: &Path,
+        _translations: &dyn TranslationLookup,
+        _options: &ExportOptions,
+        _out: &Path,
     ) -> Result<ExportReport, FormatError> {
-        // Abre source com patch engine
-        let mut engine = PatchEngine::from_file(source)?;
-
-        // Se bilíngue, precisa de lógica especial
-        if options.bilingual {
-            return self.write_bilingual(source, translations, options, out).await;
-        }
-
-        // Aplica traduções
-        let report = engine.apply_and_save(translations, out)?;
-
-        // Valida EPUB (opcional)
-        if let Err(e) = validate_epub(out) {
-            eprintln!("EPUB validation warning: {}", e);
-        }
-
-        Ok(report)
+        // TODO: Implement EPUB writing using zip crate directly
+        Err(FormatError::WriteError("EPUB writing not yet implemented. Use reflow mode to export to other formats.".into()))
     }
 
     fn supports_bilingual(&self) -> bool {
-        true
+        false
     }
 
     fn output_formats(&self) -> &'static [OutputFormat] {
@@ -185,60 +256,10 @@ impl FormatWriter for EpubWriter {
     }
 }
 
-impl EpubWriter {
-    async fn write_bilingual(
-        &self,
-        source: &Path,
-        translations: &dyn TranslationLookup,
-        options: &ExportOptions,
-        out: &Path,
-    ) -> Result<ExportReport, FormatError> {
-        // Para bilíngue: cria novo EPUB com original + tradução lado a lado
-        // Implementação simplificada - em produção criar estrutura bilíngue
-        let mut engine = PatchEngine::from_file(source)?;
-
-        // Duplica conteúdo com tradução
-        for loc in &engine.unit_locations {
-            if let Some(translated) = translations.get(&loc.unit_id) {
-                // Formato bilíngue: "Original | Tradução"
-                let bilingual = format!("{} ⟦separator⟧ {}", loc.original_text, translated.raw);
-                engine.package.update_text_node(&loc.file_path, &loc.xpath, loc.text_node_index, &bilingual)?;
-            }
-        }
-
-        engine.package.save(out)?;
-
-        Ok(ExportReport {
-            output_path: out.display().to_string(),
-            format: OutputFormat::EPUB,
-            units_processed: engine.unit_locations.len(),
-            units_with_warnings: 0,
-            units_failed: 0,
-            output_size: std::fs::metadata(out)?.len(),
-            export_time_ms: 0,
-            warnings: vec!["Bilingual format: original and translation separated by marker".into()],
-        })
-    }
-}
-
 impl ZipFormatWriter for EpubWriter {
     fn format_id(&self) -> FormatId {
         FormatId::EPUB
     }
-}
-
-/// Valida EPUB com epubcheck (se disponível)
-fn validate_epub(path: &Path) -> Result<(), String> {
-    // Tenta usar epubcheck se instalado
-    if let Ok(output) = std::process::Command::new("epubcheck")
-        .arg(path)
-        .output()
-    {
-        if !output.status.success() {
-            return Err(String::from_utf8_lossy(&output.stderr).to_string());
-        }
-    }
-    Ok(())
 }
 
 /// Verifica EPUB válido
