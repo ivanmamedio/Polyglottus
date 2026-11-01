@@ -297,7 +297,7 @@ impl TranslationProvider for OpenAICompatProvider {
             .map_err(|e| ProviderError::Provider(format!("Invalid JSON: {}", e)))?;
 
         Ok(models_resp.data.into_iter().map(|m| ModelInfo {
-            id: m.id,
+            id: m.id.clone(),
             name: m.id,
             languages: vec![Language::new("en")], // Placeholder
             max_context: 4096,
