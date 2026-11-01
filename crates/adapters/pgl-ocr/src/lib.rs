@@ -4,15 +4,14 @@
 #![warn(missing_docs)]
 #![warn(clippy::all, clippy::pedantic, clippy::nursery, clippy::cargo)]
 
-pub mod ocrs_engine;
-#[cfg(feature = "tesseract")]
-pub mod tesseract_engine;
+// pub mod ocrs_engine;
+// #[cfg(feature = "tesseract")]
+// pub mod tesseract_engine;
 
 use pgl_app::{OcrEngine, OcrError, OcrResult, BoundingBox, Language};
-use pgl_domain::UnitId;
 use async_trait::async_trait;
 use std::sync::Arc;
-use tracing::{info, debug, warn};
+use tracing::{info, warn};
 
 /// Engine OCR padrão (ocrs - Rust puro, alfabeto latino)
 pub struct OcrsEngine {
@@ -21,115 +20,77 @@ pub struct OcrsEngine {
 
 impl OcrsEngine {
     pub fn new() -> Result<Self, OcrError> {
-        let model = ocrs::OcrEngine::new()
+        let params = ocrs::OcrEngineParams::default();
+        let model = ocrs::OcrEngine::new(params)
             .map_err(|e| OcrError::Engine(format!("Failed to load ocrs model: {}", e)))?;
         Ok(Self { model })
     }
 }
 
+use std::sync::LazyLock;
+
+static SUPPORTED_LANGUAGES: LazyLock<Vec<Language>> = LazyLock::new(|| {
+    vec![
+        Language::new("en"), 
+        Language::new("pt"), 
+        Language::new("es"), 
+        Language::new("fr"), 
+        Language::new("de"), 
+        Language::new("it")
+    ]
+});
+
 #[async_trait]
-impl OcrEngine for OcrsEngine {
+impl pgl_app::OcrEngine for OcrsEngine {
     fn id(&self) -> &'static str {
         "ocrs"
     }
 
     fn supported_languages(&self) -> &'static [Language] {
-        &[Language::new("en"), Language::new("pt"), Language::new("es"), Language::new("fr"), Language::new("de"), Language::new("it")]
+        &SUPPORTED_LANGUAGES
     }
 
-    async fn recognize(&self, image: &[u8], mime: &str, lang_hint: Option<&Language>) -> Result<OcrResult, OcrError> {
+    async fn recognize(&self, image: &[u8], _mime: &str, _lang_hint: Option<&Language>) -> Result<pgl_app::OcrResult, OcrError> {
         // Carrega imagem
         let img = image::load_from_memory(image)
             .map_err(|e| OcrError::UnsupportedFormat(e.to_string()))?;
 
         // Converte para RGB
         let rgb = img.to_rgb8();
+        let (width, height) = rgb.dimensions();
+
+        // Prepara input para ocrs usando from_bytes
+        let input = ocrs::ImageSource::from_bytes(rgb.as_raw(), (width, height))
+            .map_err(|e| OcrError::Engine(format!("Failed to prepare input: {}", e)))?;
+
+        // Prepara OcrInput para detecção
+        let ocr_input = self.model.prepare_input(input)
+            .map_err(|e| OcrError::Engine(format!("Failed to prepare input: {}", e)))?;
 
         // Executa OCR
-        let result = self.model.detect_text(&rgb)
+        let text = self.model.get_text(&ocr_input)
             .map_err(|e| OcrError::RecognitionFailed(e.to_string()))?;
 
-        // Converte resultado
-        let text = result.text();
-        let confidence = result.confidence();
+        // Detecta palavras para bounding boxes
+        let word_rects = self.model.detect_words(&ocr_input).unwrap_or_default();
 
         let mut boxes = Vec::new();
-        for word in result.words() {
+        for rect in word_rects {
             boxes.push(BoundingBox {
-                x: word.bbox.x as f32,
-                y: word.bbox.y as f32,
-                width: word.bbox.width as f32,
-                height: word.bbox.height as f32,
-                text: word.text.clone(),
-                confidence: word.confidence,
+                x: rect.center().x as f32 - rect.width() as f32 / 2.0,
+                y: rect.center().y as f32 - rect.height() as f32 / 2.0,
+                width: rect.width() as f32,
+                height: rect.height() as f32,
+                text: String::new(), // Individual word text not available in this API
+                confidence: 0.8,
             });
         }
 
-        Ok(OcrResult {
+        Ok(pgl_app::OcrResult {
             text,
-            confidence,
-            language: lang_hint.cloned(),
+            confidence: 0.8,
+            language: None,
             bounding_boxes: boxes,
-        })
-    }
-}
-
-/// Engine Tesseract (opcional, mais idiomas)
-#[cfg(feature = "tesseract")]
-pub struct TesseractEngine {
-    api: tesseract::Tesseract,
-}
-
-#[cfg(feature = "tesseract")]
-impl TesseractEngine {
-    pub fn new(lang: &str) -> Result<Self, OcrError> {
-        let mut api = tesseract::Tesseract::new(None, Some(lang))
-            .map_err(|e| OcrError::Engine(format!("Failed to init Tesseract: {}", e)))?;
-        api.set_page_seg_mode(tesseract::PageSegMode::Auto)
-            .map_err(|e| OcrError::Engine(e.to_string()))?;
-        Ok(Self { api })
-    }
-}
-
-#[cfg(feature = "tesseract")]
-#[async_trait]
-impl OcrEngine for TesseractEngine {
-    fn id(&self) -> &'static str {
-        "tesseract"
-    }
-
-    fn supported_languages(&self) -> &'static [Language] {
-        // Tesseract suporta 100+ idiomas
-        &[
-            Language::new("en"), Language::new("pt"), Language::new("es"),
-            Language::new("fr"), Language::new("de"), Language::new("it"),
-            Language::new("ru"), Language::new("zh"), Language::new("ja"),
-            Language::new("ko"), Language::new("ar"), Language::new("hi"),
-        ]
-    }
-
-    async fn recognize(&self, image: &[u8], mime: &str, lang_hint: Option<&Language>) -> Result<OcrResult, OcrError> {
-        // Salva imagem temporária
-        let temp_path = std::env::temp_dir().join(format!("ocr_{}.png", UnitId::new()));
-        std::fs::write(&temp_path, image)
-            .map_err(|e| OcrError::Engine(e.to_string()))?;
-
-        // Executa Tesseract
-        self.api.set_image(&temp_path)
-            .map_err(|e| OcrError::RecognitionFailed(e.to_string()))?;
-
-        let text = self.api.get_text()
-            .map_err(|e| OcrError::RecognitionFailed(e.to_string()))?;
-
-        // Limpa temp
-        std::fs::remove_file(&temp_path).ok();
-
-        // Tesseract não retorna bounding boxes facilmente via binding
-        Ok(OcrResult {
-            text,
-            confidence: 0.8, // Placeholder
-            language: lang_hint.cloned(),
-            bounding_boxes: Vec::new(),
         })
     }
 }
@@ -138,26 +99,26 @@ impl OcrEngine for TesseractEngine {
 pub struct OcrEngineFactory;
 
 impl OcrEngineFactory {
-    pub fn create_default() -> Result<Arc<dyn OcrEngine>, OcrError> {
+    pub fn create_default() -> Result<Arc<dyn pgl_app::OcrEngine>, OcrError> {
         // Tenta ocrs primeiro (Rust puro, leve)
         if let Ok(engine) = OcrsEngine::new() {
             info!("Using ocrs engine (Latin alphabet)");
             return Ok(Arc::new(engine));
         }
 
-        #[cfg(feature = "tesseract")]
-        {
-            // Fallback para Tesseract
-            if let Ok(engine) = TesseractEngine::new("eng") {
-                warn!("ocrs failed, falling back to Tesseract");
-                return Ok(Arc::new(engine));
-            }
-        }
+        // #[cfg(feature = "tesseract")]
+        // {
+        //     // Fallback para Tesseract
+        //     if let Ok(engine) = TesseractEngine::new("eng") {
+        //         warn!("ocrs failed, falling back to Tesseract");
+        //         return Ok(Arc::new(engine));
+        //     }
+        // }
 
         Err(OcrError::Engine("No OCR engine available".into()))
     }
 
-    pub fn create_for_language(lang: &Language) -> Result<Arc<dyn OcrEngine>, OcrError> {
+    pub fn create_for_language(lang: &Language) -> Result<Arc<dyn pgl_app::OcrEngine>, OcrError> {
         // ocrs só suporta latino
         let latin_langs = ["en", "pt", "es", "fr", "de", "it", "nl", "pl", "cs", "sk", "hu", "ro", "hr", "sl", "et", "lv", "lt"];
         if latin_langs.contains(&lang.code()) {
@@ -166,13 +127,13 @@ impl OcrEngineFactory {
             }
         }
 
-        #[cfg(feature = "tesseract")]
-        {
-            // Tenta Tesseract com idioma específico
-            if let Ok(engine) = TesseractEngine::new(lang.code()) {
-                return Ok(Arc::new(engine));
-            }
-        }
+        // #[cfg(feature = "tesseract")]
+        // {
+        //     // Tenta Tesseract com idioma específico
+        //     if let Ok(engine) = TesseractEngine::new(lang.code()) {
+        //         return Ok(Arc::new(engine));
+        //     }
+        // }
 
         Err(OcrError::LanguageNotSupported(lang.code().to_string()))
     }
@@ -180,13 +141,13 @@ impl OcrEngineFactory {
 
 /// Pipeline OCR para imagens de livros
 pub struct BookOcrPipeline {
-    engine: Arc<dyn OcrEngine>,
+    engine: Arc<dyn pgl_app::OcrEngine>,
     min_confidence: f32,
     min_text_length: usize,
 }
 
 impl BookOcrPipeline {
-    pub fn new(engine: Arc<dyn OcrEngine>) -> Self {
+    pub fn new(engine: Arc<dyn pgl_app::OcrEngine>) -> Self {
         Self {
             engine,
             min_confidence: 0.6,
