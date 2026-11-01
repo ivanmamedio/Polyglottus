@@ -10,7 +10,8 @@ pub mod ocr_pdf;
 
 use std::path::Path;
 use std::sync::Arc;
-use pgl_app::{FormatReader, FormatWriter, FormatId, Confidence, FormatError, ExportOptions, ExportReport, TranslationLookup, OutputFormat};
+use async_trait::async_trait;
+use pgl_app::{FormatReader, FormatWriter, FormatId, Confidence, FormatError, ExportOptions, ExportReport, TranslationLookup, OutputFormat, SourceDocument};
 use pgl_fmt_core::sniff_zip_format;
 
 /// Leitor PDF (reflow mode - extrai texto para EPUB/DOCX/HTML)
@@ -22,16 +23,21 @@ impl PdfReflowReader {
     }
 }
 
+#[async_trait]
 impl FormatReader for PdfReflowReader {
     fn id(&self) -> FormatId {
         FormatId::PDF
+    }
+
+    fn extensions(&self) -> &'static [&'static str] {
+        &[".pdf"]
     }
 
     fn sniff(&self, name: &str, head: &[u8]) -> Confidence {
         sniff_zip_format(Path::new(name), &[".pdf"])
     }
 
-    async fn open(&self, path: &Path) -> Result<Box<dyn pgl_app::SourceDocument>, FormatError> {
+    async fn open(&self, path: &Path) -> Result<Box<dyn SourceDocument + 'static>, FormatError> {
         reflow::open_pdf_reflow(path).await
     }
 }
@@ -45,6 +51,7 @@ impl PdfOverlayWriter {
     }
 }
 
+#[async_trait]
 impl FormatWriter for PdfOverlayWriter {
     fn id(&self) -> FormatId {
         FormatId::PDF
@@ -81,9 +88,14 @@ impl PdfOcrReader {
     }
 }
 
+#[async_trait]
 impl FormatReader for PdfOcrReader {
     fn id(&self) -> FormatId {
         FormatId::PDF
+    }
+
+    fn extensions(&self) -> &'static [&'static str] {
+        &[".pdf"]
     }
 
     fn sniff(&self, name: &str, head: &[u8]) -> Confidence {
@@ -91,7 +103,7 @@ impl FormatReader for PdfOcrReader {
         sniff_zip_format(Path::new(name), &[".pdf"])
     }
 
-    async fn open(&self, path: &Path) -> Result<Box<dyn pgl_app::SourceDocument>, FormatError> {
+    async fn open(&self, path: &Path) -> Result<Box<dyn SourceDocument + 'static>, FormatError> {
         ocr_pdf::open_pdf_ocr(path).await
     }
 }

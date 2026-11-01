@@ -9,7 +9,7 @@ members = [
     # "crates/adapters/formats/pgl-fmt-ooxml",
     # "crates/adapters/formats/pgl-fmt-odf",
     "crates/adapters/formats/pgl-fmt-text",
-    # "crates/adapters/formats/pgl-fmt-pdf",
+    "crates/adapters/formats/pgl-fmt-pdf",
     # "crates/adapters/formats/pgl-fmt-convert",
     "crates/adapters/providers/pgl-provider-openai",
     # "crates/adapters/providers/pgl-provider-ollama",
@@ -45,7 +45,7 @@ pgl-fmt-core = { path = "crates/adapters/formats/pgl-fmt-core" }
 pgl-fmt-ooxml = { path = "crates/adapters/formats/pgl-fmt-ooxml" }
 pgl-fmt-odf = { path = "crates/adapters/formats/pgl-fmt-odf" }
 pgl-fmt-text = { path = "crates/adapters/formats/pgl-fmt-text" }
-# pgl-fmt-pdf = { path = "crates/adapters/formats/pgl-fmt-pdf" }
+pgl-fmt-pdf = { path = "crates/adapters/formats/pgl-fmt-pdf" }
 # pgl-fmt-convert = { path = "crates/adapters/formats/pgl-fmt-convert" }
 pgl-provider-openai = { path = "crates/adapters/providers/pgl-provider-openai" }
 # pgl-provider-ollama = { path = "crates/adapters/providers/pgl-provider-ollama" }
