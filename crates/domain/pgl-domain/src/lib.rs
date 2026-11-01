@@ -273,6 +273,8 @@ pub enum OutputFormat {
     SameAsSource,
     EPUB,
     DOCX,
+    PPTX,
+    XLSX,
     HTML,
     TXT,
     MD,

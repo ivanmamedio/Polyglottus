@@ -9,32 +9,48 @@ pub mod pptx;
 pub mod xlsx;
 
 use std::path::Path;
-use std::sync::Arc;
-use pgl_app::{FormatReader, FormatWriter, FormatId, Confidence, FormatError, ExportOptions, ExportReport, TranslationLookup, OutputFormat};
-use pgl_fmt_core::sniff_zip_format;
+use async_trait::async_trait;
+use pgl_app::{FormatReader, FormatWriter, FormatId, Confidence, FormatError, ExportOptions, ExportReport, TranslationLookup, SourceDocument, AssetRef, DocumentMetadata, OutputFormat};
+use pgl_domain::{Unit, UnitId, UnitKind, SectionId, MarkedText, Language};
+use pgl_fmt_core::{ZipFormatReader, ZipFormatWriter, ZipSourceDocument, make_source_ref, default_zip_fidelity, sniff_zip_format};
+use zip::ZipArchive;
+
+pub fn create_empty_zip() -> Vec<u8> {
+    use zip::ZipWriter;
+    use std::io::Cursor;
+    let mut buf = Vec::new();
+    {
+        let mut zip = ZipWriter::new(Cursor::new(&mut buf));
+        zip.finish().unwrap();
+    }
+    buf
+}
 
 /// Leitor DOCX
-pub struct DocxReader {
-    scanner: Arc<docx::DocxScanner>,
-}
+pub struct DocxReader;
 
 impl DocxReader {
     pub fn new() -> Self {
-        Self { scanner: Arc::new(docx::DocxScanner::new()) }
+        Self
     }
 }
 
+#[async_trait]
 impl FormatReader for DocxReader {
     fn id(&self) -> FormatId {
         FormatId::DOCX
     }
 
-    fn sniff(&self, name: &str, head: &[u8]) -> Confidence {
+    fn extensions(&self) -> &'static [&'static str] {
+        &[".docx"]
+    }
+
+    fn sniff(&self, name: &str, _head: &[u8]) -> Confidence {
         sniff_zip_format(Path::new(name), &[".docx"])
     }
 
-    async fn open(&self, path: &Path) -> Result<Box<dyn pgl_app::SourceDocument>, FormatError> {
-        self.scanner.open(path).await
+    async fn open(&self, path: &Path) -> Result<Box<dyn SourceDocument + 'static>, FormatError> {
+        docx::open_docx(path).await
     }
 }
 
@@ -47,6 +63,7 @@ impl DocxWriter {
     }
 }
 
+#[async_trait]
 impl FormatWriter for DocxWriter {
     fn id(&self) -> FormatId {
         FormatId::DOCX
@@ -72,27 +89,30 @@ impl FormatWriter for DocxWriter {
 }
 
 /// Leitor PPTX
-pub struct PptxReader {
-    scanner: Arc<pptx::PptxScanner>,
-}
+pub struct PptxReader;
 
 impl PptxReader {
     pub fn new() -> Self {
-        Self { scanner: Arc::new(pptx::PptxScanner::new()) }
+        Self
     }
 }
 
+#[async_trait]
 impl FormatReader for PptxReader {
     fn id(&self) -> FormatId {
         FormatId::PPTX
     }
 
-    fn sniff(&self, name: &str, head: &[u8]) -> Confidence {
+    fn extensions(&self) -> &'static [&'static str] {
+        &[".pptx"]
+    }
+
+    fn sniff(&self, name: &str, _head: &[u8]) -> Confidence {
         sniff_zip_format(Path::new(name), &[".pptx"])
     }
 
-    async fn open(&self, path: &Path) -> Result<Box<dyn pgl_app::SourceDocument>, FormatError> {
-        self.scanner.open(path).await
+    async fn open(&self, path: &Path) -> Result<Box<dyn SourceDocument + 'static>, FormatError> {
+        pptx::open_pptx(path).await
     }
 }
 
@@ -105,6 +125,7 @@ impl PptxWriter {
     }
 }
 
+#[async_trait]
 impl FormatWriter for PptxWriter {
     fn id(&self) -> FormatId {
         FormatId::PPTX
@@ -130,27 +151,30 @@ impl FormatWriter for PptxWriter {
 }
 
 /// Leitor XLSX
-pub struct XlsxReader {
-    scanner: Arc<xlsx::XlsxScanner>,
-}
+pub struct XlsxReader;
 
 impl XlsxReader {
     pub fn new() -> Self {
-        Self { scanner: Arc::new(xlsx::XlsxScanner::new()) }
+        Self
     }
 }
 
+#[async_trait]
 impl FormatReader for XlsxReader {
     fn id(&self) -> FormatId {
         FormatId::XLSX
     }
 
-    fn sniff(&self, name: &str, head: &[u8]) -> Confidence {
+    fn extensions(&self) -> &'static [&'static str] {
+        &[".xlsx"]
+    }
+
+    fn sniff(&self, name: &str, _head: &[u8]) -> Confidence {
         sniff_zip_format(Path::new(name), &[".xlsx"])
     }
 
-    async fn open(&self, path: &Path) -> Result<Box<dyn pgl_app::SourceDocument>, FormatError> {
-        self.scanner.open(path).await
+    async fn open(&self, path: &Path) -> Result<Box<dyn SourceDocument + 'static>, FormatError> {
+        xlsx::open_xlsx(path).await
     }
 }
 
@@ -163,6 +187,7 @@ impl XlsxWriter {
     }
 }
 
+#[async_trait]
 impl FormatWriter for XlsxWriter {
     fn id(&self) -> FormatId {
         FormatId::XLSX
@@ -179,11 +204,71 @@ impl FormatWriter for XlsxWriter {
     }
 
     fn supports_bilingual(&self) -> bool {
-        false // Planilhas bilíngues não fazem sentido típico
+        false
     }
 
     fn output_formats(&self) -> &'static [OutputFormat] {
         &[OutputFormat::XLSX]
+    }
+}
+
+impl ZipFormatReader for DocxReader {
+    fn format_id(&self) -> FormatId {
+        FormatId::DOCX
+    }
+
+    fn extensions(&self) -> &'static [&'static str] {
+        &[".docx"]
+    }
+
+    fn mime_types(&self) -> &'static [&'static str] {
+        &["application/vnd.openxmlformats-officedocument.wordprocessingml.document"]
+    }
+}
+
+impl ZipFormatReader for PptxReader {
+    fn format_id(&self) -> FormatId {
+        FormatId::PPTX
+    }
+
+    fn extensions(&self) -> &'static [&'static str] {
+        &[".pptx"]
+    }
+
+    fn mime_types(&self) -> &'static [&'static str] {
+        &["application/vnd.openxmlformats-officedocument.presentationml.presentation"]
+    }
+}
+
+impl ZipFormatReader for XlsxReader {
+    fn format_id(&self) -> FormatId {
+        FormatId::XLSX
+    }
+
+    fn extensions(&self) -> &'static [&'static str] {
+        &[".xlsx"]
+    }
+
+    fn mime_types(&self) -> &'static [&'static str] {
+        &["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"]
+    }
+}
+
+impl ZipFormatWriter for DocxWriter {
+    fn format_id(&self) -> FormatId {
+        FormatId::DOCX
+    }
+}
+
+impl ZipFormatWriter for PptxWriter {
+    fn format_id(&self) -> FormatId {
+        FormatId::PPTX
+    }
+}
+
+impl ZipFormatWriter for XlsxWriter {
+    fn format_id(&self) -> FormatId {
+        FormatId::XLSX
     }
 }
 
