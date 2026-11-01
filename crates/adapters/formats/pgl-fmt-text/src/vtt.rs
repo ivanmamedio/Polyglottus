@@ -6,6 +6,7 @@ use pgl_fmt_core::{ZipSourceDocument, default_zip_fidelity};
 use std::path::Path;
 use zip::ZipArchive;
 use regex::Regex;
+type SourceDoc = Box<dyn SourceDocument + 'static>;
 
 #[derive(Debug, Clone)]
 struct VttCue {
@@ -41,7 +42,7 @@ fn parse_vtt(content: &str) -> Result<Vec<VttCue>, FormatError> {
 }
 
 /// Abre VTT como SourceDocument
-pub async fn open_vtt(path: &Path) -> Result<Box<dyn SourceDocument>, FormatError> {
+pub async fn open_vtt(path: &Path) -> Result<SourceDoc, FormatError> {
     let content = tokio::fs::read_to_string(path).await?;
     let cues = parse_vtt(&content)?;
 

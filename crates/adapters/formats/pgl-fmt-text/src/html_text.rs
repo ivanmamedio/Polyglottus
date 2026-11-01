@@ -8,14 +8,15 @@ use zip::ZipArchive;
 use html5ever::parse_document;
 use html5ever::rcdom::RcDom;
 use html5ever::ParseOpts;
+type SourceDoc = Box<dyn SourceDocument + 'static>;
 
 /// Abre HTML como SourceDocument
-pub async fn open_html(path: &Path) -> Result<Box<dyn SourceDocument>, FormatError> {
+pub async fn open_html(path: &Path) -> Result<SourceDoc, FormatError> {
     let content = tokio::fs::read_to_string(path).await?;
 
     let dom = parse_document(RcDom::default(), ParseOpts::default())
         .from_utf8()
-        .read_from(&mut content.as_bytes())?;
+        .read_from(&mut std::io::Cursor::new(content.into_bytes()))?;
 
     let mut units = Vec::new();
     let section = SectionId::new();
@@ -118,7 +119,7 @@ pub async fn write_html(
 
     let dom = parse_document(RcDom::default(), ParseOpts::default())
         .from_utf8()
-        .read_from(&mut content.as_bytes())?;
+        .read_from(&mut std::io::Cursor::new(content.into_bytes()))?;
 
     // Aplica traduções no DOM
     let mut idx = 0;
@@ -213,7 +214,7 @@ pub async fn write_html(
 
     // Serializa
     let mut output = Vec::new();
-    html5ever::serialize(&mut output, &dom.document, html5ever::SerializeOpts::default())?;
+    html5ever::serialize(&mut output, &dom.document, html5ever::serialize::SerializeOpts::default())?;
 
     tokio::fs::write(out, output).await?;
 

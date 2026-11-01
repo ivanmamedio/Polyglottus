@@ -6,6 +6,7 @@ use pgl_fmt_core::{ZipSourceDocument, default_zip_fidelity};
 use std::path::Path;
 use zip::ZipArchive;
 use serde_json::{Value, Map};
+type SourceDoc = Box<dyn SourceDocument + 'static>;
 
 /// Detecta formato JSON i18n comum
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -75,7 +76,7 @@ fn extract_pairs(json: &Value, prefix: &str, pairs: &mut Vec<(String, String, Op
 }
 
 /// Abre JSON i18n como SourceDocument
-pub async fn open_json_i18n(path: &Path) -> Result<Box<dyn SourceDocument>, FormatError> {
+pub async fn open_json_i18n(path: &Path) -> Result<SourceDoc, FormatError> {
     let content = tokio::fs::read_to_string(path).await?;
     let json: Value = serde_json::from_str(&content)
         .map_err(|e| FormatError::ParseError(e.to_string()))?;
@@ -237,7 +238,7 @@ mod tests {
     #[tokio::test]
     async fn json_i18n_chrome_ext() {
         let mut f = NamedTempFile::new().unwrap();
-        writeln!(f, r#"{{"welcome": {{"message": "Welcome", "description": "Home page greeting"}}}}).unwrap();
+        writeln!(f, r#"{{"welcome": {{"message": "Welcome", "description": "Home page greeting"}}}}"#).unwrap();
 
         let units = open_json_i18n(f.path()).await.unwrap();
         let units_vec: Vec<_> = units.units().collect();

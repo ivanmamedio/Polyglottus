@@ -6,6 +6,7 @@ use pgl_fmt_core::{ZipSourceDocument, default_zip_fidelity};
 use std::path::Path;
 use zip::ZipArchive;
 use regex::Regex;
+type SourceDoc = Box<dyn SourceDocument + 'static>;
 
 #[derive(Debug, Clone)]
 struct SubtitleEntry {
@@ -42,7 +43,7 @@ fn parse_srt(content: &str) -> Result<Vec<SubtitleEntry>, FormatError> {
 }
 
 /// Abre SRT como SourceDocument
-pub async fn open_srt(path: &Path) -> Result<Box<dyn SourceDocument>, FormatError> {
+pub async fn open_srt(path: &Path) -> Result<SourceDoc, FormatError> {
     let content = tokio::fs::read_to_string(path).await?;
     let entries = parse_srt(&content)?;
 

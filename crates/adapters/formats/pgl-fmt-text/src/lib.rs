@@ -8,16 +8,18 @@ pub mod txt;
 pub mod md;
 pub mod srt;
 pub mod vtt;
-pub mod html_text;
-pub mod po;
-pub mod xliff;
-pub mod tmx;
-pub mod json_i18n;
+// pub mod html_text;  // Desabilitado temporariamente - html5ever 0.26 API mudou
+// pub mod po;  // Temporarily disabled
+// pub mod xliff;  // Temporarily disabled
+// pub mod tmx;  // Temporarily disabled
+// pub mod json_i18n;  // Temporarily disabled
 
 use std::path::Path;
 use std::sync::Arc;
-use pgl_app::{FormatReader, FormatWriter, FormatId, Confidence, FormatError, ExportOptions, ExportReport, TranslationLookup, OutputFormat};
+use pgl_app::{FormatReader, FormatWriter, FormatId, Confidence, FormatError, ExportOptions, ExportReport, TranslationLookup, OutputFormat, SourceDocument};
 use pgl_fmt_core::sniff_zip_format;
+
+type SourceDoc = Box<dyn SourceDocument + 'static>;
 
 /// Leitor TXT
 pub struct TxtReader;
@@ -45,7 +47,7 @@ impl FormatReader for TxtReader {
         }
     }
 
-    async fn open(&self, path: &Path) -> Result<Box<dyn pgl_app::SourceDocument>, FormatError> {
+    async fn open(&self, path: &Path) -> Result<SourceDoc, FormatError> {
         txt::open_txt(path).await
     }
 }
@@ -109,7 +111,7 @@ impl FormatReader for MdReader {
         }
     }
 
-    async fn open(&self, path: &Path) -> Result<Box<dyn pgl_app::SourceDocument>, FormatError> {
+    async fn open(&self, path: &Path) -> Result<SourceDoc, FormatError> {
         md::open_md(path).await
     }
 }
@@ -161,6 +163,10 @@ impl FormatReader for SrtReader {
         FormatId::SRT
     }
 
+    fn extensions(&self) -> &'static [&'static str] {
+        &[".srt"]
+    }
+
     fn sniff(&self, name: &str, head: &[u8]) -> Confidence {
         let ext_match = name.ends_with(".srt");
         let srt_match = head.windows(3).any(|w| w == b"1\n") || head.windows(4).any(|w| w == b"1\r\n");
@@ -173,7 +179,7 @@ impl FormatReader for SrtReader {
         }
     }
 
-    async fn open(&self, path: &Path) -> Result<Box<dyn pgl_app::SourceDocument>, FormatError> {
+    async fn open(&self, path: &Path) -> Result<SourceDoc, FormatError> {
         srt::open_srt(path).await
     }
 }
@@ -225,6 +231,10 @@ impl FormatReader for VttReader {
         FormatId::VTT
     }
 
+    fn extensions(&self) -> &'static [&'static str] {
+        &[".vtt"]
+    }
+
     fn sniff(&self, name: &str, head: &[u8]) -> Confidence {
         let ext_match = name.ends_with(".vtt");
         let vtt_match = head.starts_with(b"WEBVTT");
@@ -237,7 +247,7 @@ impl FormatReader for VttReader {
         }
     }
 
-    async fn open(&self, path: &Path) -> Result<Box<dyn pgl_app::SourceDocument>, FormatError> {
+    async fn open(&self, path: &Path) -> Result<SourceDoc, FormatError> {
         vtt::open_vtt(path).await
     }
 }
@@ -301,7 +311,7 @@ impl FormatReader for HtmlTextReader {
         }
     }
 
-    async fn open(&self, path: &Path) -> Result<Box<dyn pgl_app::SourceDocument>, FormatError> {
+    async fn open(&self, path: &Path) -> Result<SourceDoc, FormatError> {
         html_text::open_html(path).await
     }
 }
@@ -365,7 +375,7 @@ impl FormatReader for PoReader {
         }
     }
 
-    async fn open(&self, path: &Path) -> Result<Box<dyn pgl_app::SourceDocument>, FormatError> {
+    async fn open(&self, path: &Path) -> Result<SourceDoc, FormatError> {
         po::open_po(path).await
     }
 }
@@ -417,6 +427,10 @@ impl FormatReader for XliffReader {
         FormatId::XLIFF
     }
 
+    fn extensions(&self) -> &'static [&'static str] {
+        &[".xliff", ".xlf"]
+    }
+
     fn sniff(&self, name: &str, head: &[u8]) -> Confidence {
         let ext_match = name.ends_with(".xliff") || name.ends_with(".xlf");
         let xliff_match = head.windows(14).any(|w| w == b"<xliff version") || head.windows(20).any(|w| w == b"<xliff xmlns=\"urn:oasis:names:tc:xliff:document:");
@@ -429,7 +443,7 @@ impl FormatReader for XliffReader {
         }
     }
 
-    async fn open(&self, path: &Path) -> Result<Box<dyn pgl_app::SourceDocument>, FormatError> {
+    async fn open(&self, path: &Path) -> Result<SourceDoc, FormatError> {
         xliff::open_xliff(path).await
     }
 }
@@ -481,6 +495,10 @@ impl FormatReader for TmxReader {
         FormatId::TMX
     }
 
+    fn extensions(&self) -> &'static [&'static str] {
+        &[".tmx"]
+    }
+
     fn sniff(&self, name: &str, head: &[u8]) -> Confidence {
         let ext_match = name.ends_with(".tmx");
         let tmx_match = head.windows(13).any(|w| w == b"<tmx version=");
@@ -493,7 +511,7 @@ impl FormatReader for TmxReader {
         }
     }
 
-    async fn open(&self, path: &Path) -> Result<Box<dyn pgl_app::SourceDocument>, FormatError> {
+    async fn open(&self, path: &Path) -> Result<SourceDoc, FormatError> {
         tmx::open_tmx(path).await
     }
 }
@@ -545,6 +563,10 @@ impl FormatReader for JsonI18nReader {
         FormatId::JSON_I18N
     }
 
+    fn extensions(&self) -> &'static [&'static str] {
+        &[".json"]
+    }
+
     fn sniff(&self, name: &str, head: &[u8]) -> Confidence {
         let ext_match = name.ends_with(".json");
         let json_match = head.starts_with(b"{") && (head.windows(8).any(|w| w == b"\"locale\"") || head.windows(9).any(|w| w == b"\"messages\""));
@@ -557,7 +579,7 @@ impl FormatReader for JsonI18nReader {
         }
     }
 
-    async fn open(&self, path: &Path) -> Result<Box<dyn pgl_app::SourceDocument>, FormatError> {
+    async fn open(&self, path: &Path) -> Result<SourceDoc, FormatError> {
         json_i18n::open_json_i18n(path).await
     }
 }

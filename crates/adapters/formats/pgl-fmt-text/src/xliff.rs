@@ -7,6 +7,7 @@ use std::path::Path;
 use zip::ZipArchive;
 use quick_xml::Reader;
 use quick_xml::events::Event;
+type SourceDoc = Box<dyn SourceDocument + 'static>;
 
 #[derive(Debug, Clone)]
 struct XliffUnit {
@@ -21,7 +22,7 @@ struct XliffUnit {
 fn parse_xliff(content: &str) -> Result<Vec<XliffUnit>, FormatError> {
     let mut units = Vec::new();
     let mut reader = Reader::from_str(content);
-    reader.config_mut().trim_text(true);
+    reader.config().trim_text(true);
 
     let mut current_unit: Option<XliffUnit> = None;
     let mut in_source = false;
@@ -99,7 +100,7 @@ fn parse_xliff(content: &str) -> Result<Vec<XliffUnit>, FormatError> {
 }
 
 /// Abre XLIFF como SourceDocument
-pub async fn open_xliff(path: &Path) -> Result<Box<dyn SourceDocument>, FormatError> {
+pub async fn open_xliff(path: &Path) -> Result<SourceDoc, FormatError> {
     let content = tokio::fs::read_to_string(path).await?;
     let units_data = parse_xliff(&content)?;
 
@@ -134,7 +135,7 @@ pub async fn open_xliff(path: &Path) -> Result<Box<dyn SourceDocument>, FormatEr
         .with_preserved("Estrutura XLIFF (unidades, grupos)")
         .with_preserved("Traduções existentes (target)")
         .with_preserved("Notas e contexto")
-        .with_preserved "Dataypes (html, plaintext, etc.)")
+        .with_preserved("Datatypes (html, plaintext, etc.)")
         .with_not_preserved("Validação de esquema")
         .with_warning("XLIFF 2.0 tem recursos avançados não totalmente suportados");
 
@@ -216,7 +217,7 @@ fn escape_xml(s: &str) -> String {
     s.replace('&', "&")
         .replace('<', "<")
         .replace('>', ">")
-        .replace('"', """)
+        .replace('"', "\"")
         .replace('\'', "&apos;")
 }
 
@@ -235,8 +236,8 @@ mod tests {
         writeln!(f, r#"    <body>"#).unwrap();
         writeln!(f, r#"      <trans-unit id="1"><source>Hello</source><target>Olá</target></trans-unit>"#).unwrap();
         writeln!(f, r#"    </body>"#).unwrap();
-        writeln!(f, r#"  </file>"#).unwrap();
-        writeln!(f, r#"</xliff>"#).unwrap();
+        writeln!(f, "  </file>").unwrap();
+        writeln!(f, "</xliff>").unwrap();
 
         let units = open_xliff(f.path()).await.unwrap();
         let units_vec: Vec<_> = units.units().collect();

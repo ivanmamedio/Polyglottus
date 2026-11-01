@@ -15,8 +15,13 @@ quick-xml = { workspace = true }
 thiserror = { workspace = true }
 anyhow = { workspace = true }
 serde = { workspace = true }
+serde_json = { workspace = true }
 pulldown-cmark = "0.10"
 comrak = { version = "0.20", features = ["default"] }
+zip = { workspace = true }
+tokio = { workspace = true, features = ["fs", "macros"] }
+regex = { workspace = true }
+md5 = { workspace = true }
 
 [dev-dependencies]
 insta = { workspace = true }

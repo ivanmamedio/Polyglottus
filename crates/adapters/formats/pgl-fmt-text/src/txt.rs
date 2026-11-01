@@ -6,9 +6,11 @@ use pgl_fmt_core::{ZipSourceDocument, default_zip_fidelity};
 use std::path::Path;
 use std::collections::HashMap;
 use zip::ZipArchive;
+type SourceDoc = Box<dyn SourceDocument + 'static>;
+
 
 /// Abre TXT como SourceDocument
-pub async fn open_txt(path: &Path) -> Result<Box<dyn SourceDocument>, FormatError> {
+pub async fn open_txt(path: &Path) -> Result<SourceDoc, FormatError> {
     let content = tokio::fs::read_to_string(path).await?;
 
     // Divide em parágrafos (linhas vazias)

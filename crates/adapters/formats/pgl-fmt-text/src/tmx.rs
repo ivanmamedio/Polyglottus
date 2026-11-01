@@ -7,6 +7,7 @@ use std::path::Path;
 use zip::ZipArchive;
 use quick_xml::Reader;
 use quick_xml::events::Event;
+type SourceDoc = Box<dyn SourceDocument + 'static>;
 
 #[derive(Debug, Clone)]
 struct TmxTu {
@@ -25,7 +26,7 @@ use std::collections::HashMap;
 fn parse_tmx(content: &str) -> Result<Vec<TmxTu>, FormatError> {
     let mut tus = Vec::new();
     let mut reader = Reader::from_str(content);
-    reader.config_mut().trim_text(true);
+    reader.config().trim_text(true);
 
     let mut current_tu: Option<TmxTu> = None;
     let mut current_tuv: Option<(String, String)> = None; // (lang, text)
@@ -125,7 +126,7 @@ fn parse_tmx(content: &str) -> Result<Vec<TmxTu>, FormatError> {
 }
 
 /// Abre TMX como SourceDocument
-pub async fn open_tmx(path: &Path) -> Result<Box<dyn SourceDocument>, FormatError> {
+pub async fn open_tmx(path: &Path) -> Result<SourceDoc, FormatError> {
     let content = tokio::fs::read_to_string(path).await?;
     let tus = parse_tmx(&content)?;
 
@@ -237,7 +238,7 @@ fn escape_xml(s: &str) -> String {
     s.replace('&', "&")
         .replace('<', "<")
         .replace('>', ">")
-        .replace('"', """)
+        .replace('"', "\"")
         .replace('\'', "&apos;")
 }
 
@@ -256,7 +257,7 @@ mod tests {
         writeln!(f, r#"  <body>"#).unwrap();
         writeln!(f, r#"    <tu><tuv xml:lang="en"><seg>Hello</seg></tuv><tuv xml:lang="pt"><seg>Olá</seg></tuv></tu>"#).unwrap();
         writeln!(f, r#"  </body>"#).unwrap();
-        writeln!(f, r#"</tmx>"#).unwrap();
+        writeln!(f, "</tmx>").unwrap();
 
         let units = open_tmx(f.path()).await.unwrap();
         let units_vec: Vec<_> = units.units().collect();

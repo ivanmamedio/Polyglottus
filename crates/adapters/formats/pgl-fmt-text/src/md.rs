@@ -6,9 +6,10 @@ use pgl_fmt_core::{ZipSourceDocument, default_zip_fidelity};
 use std::path::Path;
 use zip::ZipArchive;
 use comrak::{parse_document, Arena, ComrakOptions, nodes::NodeValue};
+type SourceDoc = Box<dyn SourceDocument + 'static>;
 
 /// Abre MD como SourceDocument
-pub async fn open_md(path: &Path) -> Result<Box<dyn SourceDocument>, FormatError> {
+pub async fn open_md(path: &Path) -> Result<SourceDoc, FormatError> {
     let content = tokio::fs::read_to_string(path).await?;
     let arena = Arena::new();
     let root = parse_document(&arena, &content, &ComrakOptions::default());
@@ -68,7 +69,7 @@ pub async fn open_md(path: &Path) -> Result<Box<dyn SourceDocument>, FormatError
                     *idx += 1;
                 }
             }
-            NodeValue::Item => {
+            NodeValue::ListItem => {
                 let text = node_to_text(node);
                 if !text.trim().is_empty() {
                     let unit_id = UnitId::new();
@@ -139,7 +140,7 @@ pub async fn write_md(
     let mut output = String::new();
     fn rebuild(node: &comrak::nodes::AstNode, translations: &dyn TranslationLookup, output: &mut String, options: &ExportOptions, idx: &mut usize) {
         match &node.data.borrow().value {
-            NodeValue::Paragraph | NodeValue::Heading(_) | NodeValue::CodeBlock(_) | NodeValue::Item => {
+            NodeValue::Paragraph | NodeValue::Heading(_) | NodeValue::CodeBlock(_) | NodeValue::ListItem => {
                 let unit_id = UnitId::from_hash(&{
                     use std::hash::{Hash, Hasher};
                     let mut hasher = std::collections::hash_map::DefaultHasher::new();
@@ -152,12 +153,12 @@ pub async fn write_md(
                     output.push_str(&translated.raw);
                 } else {
                     // Fallback: render original
-                    comrak::format_commonmark(node, output, &ComrakOptions::default()).ok();
+                    comrak::format_commonmark(node, &mut output, &ComrakOptions::default()).ok();
                 }
                 *idx += 1;
             }
             _ => {
-                comrak::format_commonmark(node, output, &ComrakOptions::default()).ok();
+                comrak::format_commonmark(node, &mut output, &ComrakOptions::default()).ok();
             }
         }
 
@@ -183,8 +184,6 @@ pub async fn write_md(
     })
 }
 
-use pgl_domain::UnitId;
-use comrak::nodes::NodeValue;
 
 #[cfg(test)]
 mod tests {

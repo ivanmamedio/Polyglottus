@@ -6,6 +6,7 @@ use pgl_fmt_core::{ZipSourceDocument, default_zip_fidelity};
 use std::path::Path;
 use zip::ZipArchive;
 use regex::Regex;
+type SourceDoc = Box<dyn SourceDocument + 'static>;
 
 #[derive(Debug, Clone)]
 struct PoEntry {
@@ -18,7 +19,7 @@ struct PoEntry {
 
 /// Parse PO content
 fn parse_po(content: &str) -> Result<Vec<PoEntry>, FormatError> {
-    let mut entries = Vec::mut();
+    let mut entries = Vec::new();
     let mut current = PoEntry {
         msgid: String::new(),
         msgstr: String::new(),
@@ -38,7 +39,7 @@ fn parse_po(content: &str) -> Result<Vec<PoEntry>, FormatError> {
     for line in content.lines() {
         let line = line.trim();
 
-        if line.is_empty() || line.starts_with('#:') {
+        if line.is_empty() || line.starts_with("#:") {
             // Finaliza entrada anterior se tem msgid
             if !current.msgid.is_empty() {
                 entries.push(current.clone());
@@ -102,7 +103,7 @@ fn parse_po(content: &str) -> Result<Vec<PoEntry>, FormatError> {
 }
 
 /// Abre PO como SourceDocument
-pub async fn open_po(path: &Path) -> Result<Box<dyn SourceDocument>, FormatError> {
+pub async fn open_po(path: &Path) -> Result<SourceDoc, FormatError> {
     let content = tokio::fs::read_to_string(path).await?;
     let entries = parse_po(&content)?;
 
