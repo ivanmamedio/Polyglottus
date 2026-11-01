@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::{Read, Write, Seek, Cursor};
 use std::path::Path;
-use pgl_fmt_core::zip_safe::{open_zip_safe, create_zip_safe, add_entry_safe, extract_entry_bytes, list_entries_safe};
+use pgl_fmt_core::zip_safe::{open_zip_safe, create_zip_safe, add_entry_safe, extract_entry_bytes, extract_entry_bytes_by_name, list_entries_safe};
 use pgl_app::FormatError;
 
 /// Pacote OPC genérico
@@ -55,10 +55,10 @@ impl OpcPackage {
         let mut parts = HashMap::new();
         let mut content_parts = HashMap::new();
 
-        for entry_info in list_entries_safe(&archive) {
+        for entry_info in list_entries_safe(&mut archive) {
             if entry_info.is_dir { continue; }
 
-            let content = extract_entry_bytes(&mut archive, entry_info.name)?;
+            let content = extract_entry_bytes_by_name(&mut archive, &entry_info.name)?;
             let is_xml = Self::is_xml_content(&entry_info.name, &content, &content_types);
 
             parts.insert(entry_info.name.clone(), content.clone());
@@ -198,7 +198,8 @@ impl OpcPackage {
 
     /// Salva pacote
     pub fn save(&self, path: &Path) -> Result<(), FormatError> {
-        let mut zip = create_zip_safe(path)?;
+        let file = std::fs::File::create(path)?;
+        let mut zip = create_zip_safe(file)?;
 
         for (name, content) in &self.parts {
             add_entry_safe(&mut zip, name, content)?;

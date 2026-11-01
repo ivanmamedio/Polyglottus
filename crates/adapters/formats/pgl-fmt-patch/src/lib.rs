@@ -64,7 +64,7 @@ impl PatchEngine {
                 html5ever::rcdom::RcDom::default(),
                 html5ever::ParseOpts::default(),
             ).from_utf8()
-            .read_from(&mut content.as_bytes())?;
+            .read_from(&mut content.as_slice())?;
 
             // Encontra todos os nós de texto traduzíveis
             Self::find_translatable_nodes(&doc.document, file_path, &mut locations, 0)?;

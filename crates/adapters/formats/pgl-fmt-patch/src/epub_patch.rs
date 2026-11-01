@@ -117,7 +117,7 @@ impl EpubScanner {
             html5ever::rcdom::RcDom::default(),
             html5ever::ParseOpts::default(),
         ).from_utf8()
-        .read_from(&mut content.as_slice())?;
+        .read_from(content)?;
 
         self.walk_xhtml(&doc.document, file_path, locations, section_index)
     }
@@ -127,7 +127,7 @@ impl EpubScanner {
             html5ever::rcdom::RcDom::default(),
             html5ever::ParseOpts::default(),
         ).from_utf8()
-        .read_from(&mut content.as_slice())?;
+        .read_from(content)?;
 
         self.walk_xhtml(&doc.document, "nav.xhtml", locations, 0)
     }

@@ -42,7 +42,7 @@ impl HtmlScanner {
             html5ever::rcdom::RcDom::default(),
             html5ever::ParseOpts::default(),
         ).from_utf8()
-        .read_from(&mut content.as_slice())?;
+        .read_from(content)?;
 
         self.walk_html(&doc.document, file_path, locations)
     }
@@ -157,6 +157,10 @@ impl pgl_fmt_core::ZipFormatReader for HtmlReader {
 impl pgl_app::FormatReader for HtmlReader {
     fn id(&self) -> pgl_app::FormatId {
         pgl_app::FormatId::HTML
+    }
+
+    fn extensions(&self) -> &'static [&'static str] {
+        &[".html", ".htm", ".xhtml"]
     }
 
     fn sniff(&self, name: &str, head: &[u8]) -> pgl_app::Confidence {

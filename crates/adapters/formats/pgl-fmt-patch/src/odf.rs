@@ -41,7 +41,7 @@ impl OdfScanner {
             html5ever::rcdom::RcDom::default(),
             html5ever::ParseOpts::default(),
         ).from_utf8()
-        .read_from(&mut content.as_slice())?;
+        .read_from(content)?;
 
         self.walk_odf(&doc.document, "content.xml", locations, 0)
     }
@@ -52,7 +52,7 @@ impl OdfScanner {
             html5ever::rcdom::RcDom::default(),
             html5ever::ParseOpts::default(),
         ).from_utf8()
-        .read_from(&mut content.as_slice())?;
+        .read_from(content)?;
 
         self.walk_odf(&doc.document, "styles.xml", locations, 0)
     }
