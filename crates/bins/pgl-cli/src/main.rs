@@ -4,21 +4,21 @@
 #![warn(missing_docs)]
 #![warn(clippy::all, clippy::pedantic, clippy::nursery, clippy::cargo)]
 
-use pgl_app::{ImportBook, PlanTranslation, ExecuteJob, ExportBook, FormatRegistry};
+use pgl_app::{ImportBook, PlanTranslation, ExecuteJob, ExportBook, FormatRegistry, SecretStore};
 use pgl_domain::{Language, ExportOptions, OutputFormat, JobConfig};
-use pgl_fmt_epub::{EpubReader, EpubWriter};
-use pgl_fmt_ooxml::{DocxReader, DocxWriter, PptxReader, PptxWriter, XlsxReader, XlsxWriter};
-use pgl_fmt_odf::{OdtReader, OdtWriter, OdpReader, OdpWriter, OdsReader, OdsWriter};
-use pgl_fmt_text::{TxtReader, TxtWriter, MdReader, MdWriter, SrtReader, SrtWriter, VttReader, VttWriter, HtmlTextReader, HtmlTextWriter, PoReader, PoWriter, XliffReader, XliffWriter, TmxReader, TmxWriter, JsonI18nReader, JsonI18nWriter};
-use pgl_fmt_pdf::{PdfReflowReader, PdfOverlayWriter};
-use pgl_fmt_convert::{ConverterRegistry, ConvertReader, ConvertWriter};
-use pgl_providers_openai::OpenAICompatProvider;
-use pgl_providers_ollama::OllamaProvider;
-use pgl_providers_embedded::EmbeddedProvider;
-use pgl_ocr::OcrEngineFactory;
-use pgl_storage::SqliteRepository;
+// use pgl_fmt_epub::{EpubReader, EpubWriter};
+// use pgl_fmt_ooxml::{DocxReader, DocxWriter, PptxReader, PptxWriter, XlsxReader, XlsxWriter};
+// use pgl_fmt_odf::{OdtReader, OdtWriter, OdpReader, OdpWriter, OdsReader, OdsWriter};
+// use pgl_fmt_text::{TxtReader, TxtWriter, MdReader, MdWriter, SrtReader, SrtWriter, VttReader, VttWriter, HtmlTextReader, HtmlTextWriter, PoReader, PoWriter, XliffReader, XliffWriter, TmxReader, TmxWriter, JsonI18nReader, JsonI18nWriter};
+// use pgl_fmt_pdf::{PdfReflowReader, PdfOverlayWriter};
+// use pgl_fmt_convert::{ConverterRegistry, ConvertReader, ConvertWriter};
+use pgl_provider_openai::OpenAICompatProvider;
+// use pgl_providers_ollama::OllamaProvider;
+// use pgl_providers_embedded::EmbeddedProvider;
+// use pgl_ocr::OcrEngineFactory;
+// use pgl_storage::SqliteRepository;
 use pgl_secrets::SystemSecretStore;
-use pgl_models::ModelCatalogImpl;
+// use pgl_models::ModelCatalogImpl;
 use clap::{Parser, Subcommand};
 use indicatif::{ProgressBar, ProgressStyle};
 use std::path::PathBuf;
@@ -204,68 +204,65 @@ async fn main() -> anyhow::Result<()> {
 
     // Data dir
     let data_dir = cli.data_dir.unwrap_or_else(|| {
-        dirs::data_dir()
-            .unwrap_or_else(|| PathBuf::from("."))
+        // dirs::data_dir()
+        //     .unwrap_or_else(|| PathBuf::from("."))
+        PathBuf::from(".")
             .join("polyglottus")
     });
     std::fs::create_dir_all(&data_dir)?;
 
     // Inicializa componentes
     let db_path = data_dir.join("polyglottus.db");
-    let repo = Arc::new(SqliteRepository::new(&db_path).await?);
+    // let repo = Arc::new(SqliteRepository::new(&db_path).await?);
     let secrets = Arc::new(SystemSecretStore::new("polyglottus"));
-    let mut catalog = ModelCatalogImpl::new(pgl_models::CatalogConfig {
-        models_dir: data_dir.join("models"),
-        ..Default::default()
-    })?;
-    catalog.initialize().await?;
+    // let repo = Arc::new(DummyRepository::new());
 
     // Registry de formatos
     let mut fmt_registry = FormatRegistry::new();
-    fmt_registry.register_reader(Arc::new(EpubReader::new()));
-    fmt_registry.register_writer(Arc::new(EpubWriter::new()));
-    fmt_registry.register_reader(Arc::new(DocxReader::new()));
-    fmt_registry.register_writer(Arc::new(DocxWriter::new()));
-    fmt_registry.register_reader(Arc::new(PptxReader::new()));
-    fmt_registry.register_writer(Arc::new(PptxWriter::new()));
-    fmt_registry.register_reader(Arc::new(XlsxReader::new()));
-    fmt_registry.register_writer(Arc::new(XlsxWriter::new()));
-    fmt_registry.register_reader(Arc::new(OdtReader::new()));
-    fmt_registry.register_writer(Arc::new(OdtWriter::new()));
-    fmt_registry.register_reader(Arc::new(OdpReader::new()));
-    fmt_registry.register_writer(Arc::new(OdpWriter::new()));
-    fmt_registry.register_reader(Arc::new(OdsReader::new()));
-    fmt_registry.register_writer(Arc::new(OdsWriter::new()));
-    fmt_registry.register_reader(Arc::new(TxtReader::new()));
+    // fmt_registry.register_reader(Arc::new(EpubReader::new()));
+    // fmt_registry.register_writer(Arc::new(EpubWriter::new()));
+    // fmt_registry.register_reader(Arc::new(DocxReader::new()));
+    // fmt_registry.register_writer(Arc::new(DocxWriter::new()));
+    // fmt_registry.register_reader(Arc::new(PptxReader::new()));
+    // fmt_registry.register_writer(Arc::new(PptxWriter::new()));
+    // fmt_registry.register_reader(Arc::new(XlsxReader::new()));
+    // fmt_registry.register_writer(Arc::new(XlsxWriter::new()));
+    // fmt_registry.register_reader(Arc::new(OdtReader::new()));
+    // fmt_registry.register_writer(Arc::new(OdtWriter::new()));
+    // fmt_registry.register_reader(Arc::new(OdpReader::new()));
+    // fmt_registry.register_writer(Arc::new(OdpWriter::new()));
+    // fmt_registry.register_reader(Arc::new(OdsReader::new()));
+    // fmt_registry.register_writer(Arc::new(OdsWriter::new()));
+    // fmt_registry.register_reader(Arc::new(TxtReader::new()));
     fmt_registry.register_writer(Arc::new(TxtWriter::new()));
-    fmt_registry.register_reader(Arc::new(MdReader::new()));
-    fmt_registry.register_writer(Arc::new(MdWriter::new()));
-    fmt_registry.register_reader(Arc::new(SrtReader::new()));
-    fmt_registry.register_writer(Arc::new(SrtWriter::new()));
-    fmt_registry.register_reader(Arc::new(VttReader::new()));
-    fmt_registry.register_writer(Arc::new(VttWriter::new()));
-    fmt_registry.register_reader(Arc::new(HtmlTextReader::new()));
-    fmt_registry.register_writer(Arc::new(HtmlTextWriter::new()));
-    fmt_registry.register_reader(Arc::new(PoReader::new()));
-    fmt_registry.register_writer(Arc::new(PoWriter::new()));
-    fmt_registry.register_reader(Arc::new(XliffReader::new()));
-    fmt_registry.register_writer(Arc::new(XliffWriter::new()));
-    fmt_registry.register_reader(Arc::new(TmxReader::new()));
-    fmt_registry.register_writer(Arc::new(TmxWriter::new()));
-    fmt_registry.register_reader(Arc::new(JsonI18nReader::new()));
-    fmt_registry.register_writer(Arc::new(JsonI18nWriter::new()));
-    fmt_registry.register_reader(Arc::new(PdfReflowReader::new()));
-    fmt_registry.register_writer(Arc::new(PdfOverlayWriter::new()));
+    // fmt_registry.register_reader(Arc::new(MdReader::new()));
+    // fmt_registry.register_writer(Arc::new(MdWriter::new()));
+    // fmt_registry.register_reader(Arc::new(SrtReader::new()));
+    // fmt_registry.register_writer(Arc::new(SrtWriter::new()));
+    // fmt_registry.register_reader(Arc::new(VttReader::new()));
+    // fmt_registry.register_writer(Arc::new(VttWriter::new()));
+    // fmt_registry.register_reader(Arc::new(HtmlTextReader::new()));
+    // fmt_registry.register_writer(Arc::new(HtmlTextWriter::new()));
+    // fmt_registry.register_reader(Arc::new(PoReader::new()));
+    // fmt_registry.register_writer(Arc::new(PoWriter::new()));
+    // fmt_registry.register_reader(Arc::new(XliffReader::new()));
+    // fmt_registry.register_writer(Arc::new(XliffWriter::new()));
+    // fmt_registry.register_reader(Arc::new(TmxReader::new()));
+    // fmt_registry.register_writer(Arc::new(TmxWriter::new()));
+    // fmt_registry.register_reader(Arc::new(JsonI18nReader::new()));
+    // fmt_registry.register_writer(Arc::new(JsonI18nWriter::new()));
+    // fmt_registry.register_reader(Arc::new(PdfReflowReader::new()));
+    // fmt_registry.register_writer(Arc::new(PdfOverlayWriter::new()));
 
     // Conversores
-    let converter_registry = ConverterRegistry::default();
-    for converter in converter_registry.converters {
-        fmt_registry.register_reader(Arc::new(ConvertReader::new(converter.clone())));
-        fmt_registry.register_writer(Arc::new(ConvertWriter::new(converter)));
-    }
+    // let converter_registry = ConverterRegistry::default();
+    // for converter in converter_registry.converters {
+    //     fmt_registry.register_reader(Arc::new(ConvertReader::new(converter.clone())));
+    //     fmt_registry.register_writer(Arc::new(ConvertWriter::new(converter)));
+    // }
 
     // OCR
-    let ocr_engine = OcrEngineFactory::create_default().ok();
+    // let ocr_engine = OcrEngineFactory::create_default().ok();
 
     match cli.command {
         Commands::Import { input, name, target_lang } => {
@@ -315,19 +312,21 @@ async fn main() -> anyhow::Result<()> {
                     Arc::new(p)
                 }
                 "ollama" => {
-                    let mut p = OllamaProvider::new(pgl_providers_ollama::OllamaConfig {
-                        base_url: url.unwrap_or_else(|| "http://localhost:11434".into()),
-                        ..Default::default()
-                    })?;
-                    if let Some(m) = model { p.default_model = m; }
-                    Arc::new(p)
+                    // let mut p = OllamaProvider::new(pgl_providers_ollama::OllamaConfig {
+                    //     base_url: url.unwrap_or_else(|| "http://localhost:11434".into()),
+                    //     ..Default::default()
+                    // })?;
+                    // if let Some(m) = model { p.default_model = m; }
+                    // Arc::new(p)
+                    anyhow::bail!("Ollama provider not available (pgl-provider-ollama not compiled)")
                 }
                 "embedded" => {
-                    let path = model_path.ok_or_else(|| anyhow::anyhow!("model_path required for embedded provider"))?;
-                    let mut p = EmbeddedProvider::new(pgl_providers_embedded::EmbeddedConfig::default())
-                        .with_model_path(path);
-                    p.load_model()?;
-                    Arc::new(p)
+                    // let path = model_path.ok_or_else(|| anyhow::anyhow!("model_path required for embedded provider"))?;
+                    // let mut p = EmbeddedProvider::new(pgl_providers_embedded::EmbeddedConfig::default())
+                    //     .with_model_path(path);
+                    // p.load_model()?;
+                    // Arc::new(p)
+                    anyhow::bail!("Embedded provider not available (pgl-provider-embedded not compiled)")
                 }
                 _ => anyhow::bail!("Unknown provider: {}", provider),
             };
@@ -358,9 +357,10 @@ async fn main() -> anyhow::Result<()> {
             });
 
             // Planeja
-            let planner = PlanTranslation::new(Arc::new(catalog));
-            let plan = planner.execute(&job).await?;
-            info!("Plan: {} units, ~{}s, model: {}", plan.total_units, plan.estimated_time_secs, plan.recommended_model.model_id);
+            // let planner = PlanTranslation::new(Arc::new(catalog));
+            // let plan = planner.execute(&job).await?;
+            // info!("Plan: {} units, ~{}s, model: {}", plan.total_units, plan.estimated_time_secs, plan.recommended_model.model_id);
+            info!("Translation started (planner not available without pgl-models)");
 
             // Executa com progress bar
             let pb = ProgressBar::new(job.units.len() as u64);
@@ -402,43 +402,45 @@ async fn main() -> anyhow::Result<()> {
         }
 
         Commands::Models { action } => {
-            match action {
-                ModelAction::List => {
-                    let models = catalog.list_installed().await?;
-                    for m in models {
-                        println!("{} - {:.1} GB", m.id, m.size_gb.unwrap_or(0.0));
-                    }
-                }
-                ModelAction::Recommend { target_lang } => {
-                    let hw = catalog.detect_hardware().await?;
-                    let rec = catalog.recommend_model(&hw, &pgl_domain::LangPair {
-                        source: Language::new("auto"),
-                        target: Language::new(target_lang),
-                    }).await?;
-                    println!("Recommended: {}", rec.model_id);
-                    println!("Reason: {}", rec.reason);
-                    println!("Speed: {}", rec.estimated_speed);
-                    println!("RAM: {:.1} GB", rec.estimated_ram_gb);
-                    println!("Quality: {:?}", rec.quality_tier);
-                    println!("Size: {:.1} GB", rec.download_size_gb);
-                    println!("License: {}", rec.license);
-                }
-                ModelAction::Download { model_id } => {
-                    let pb = ProgressBar::new(100);
-                    pb.set_style(ProgressStyle::default_bar()
-                        .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({percent}%)")
-                        .unwrap());
-                    catalog.download_model(&model_id, |d, t| {
-                        pb.set_length(t);
-                        pb.set_position(d);
-                    }).await?;
-                    pb.finish_with_message("Downloaded!");
-                }
-                ModelAction::Remove { model_id } => {
-                    catalog.remove_model(&model_id).await?;
-                    info!("Model removed: {}", model_id);
-                }
-            }
+            // Models commands require pgl-models crate
+            eprintln!("Models commands not available (pgl-models not compiled)");
+            // match action {
+            //     ModelAction::List => {
+            //         let models = catalog.list_installed().await?;
+            //         for m in models {
+            //             println!("{} - {:.1} GB", m.id, m.size_gb.unwrap_or(0.0));
+            //         }
+            //     }
+            //     ModelAction::Recommend { target_lang } => {
+            //         let hw = catalog.detect_hardware().await?;
+            //         let rec = catalog.recommend_model(&hw, &pgl_domain::LangPair {
+            //             source: Language::new("auto"),
+            //             target: Language::new(target_lang),
+            //         }).await?;
+            //         println!("Recommended: {}", rec.model_id);
+            //         println!("Reason: {}", rec.reason);
+            //         println!("Speed: {}", rec.estimated_speed);
+            //         println!("RAM: {:.1} GB", rec.estimated_ram_gb);
+            //         println!("Quality: {:?}", rec.quality_tier);
+            //         println!("Size: {:.1} GB", rec.download_size_gb);
+            //         println!("License: {}", rec.license);
+            //     }
+            //     ModelAction::Download { model_id } => {
+            //         let pb = ProgressBar::new(100);
+            //         pb.set_style(ProgressStyle::default_bar()
+            //             .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({percent}%)")
+            //             .unwrap());
+            //         catalog.download_model(&model_id, |d, t| {
+            //             pb.set_length(t);
+            //             pb.set_position(d);
+            //         }).await?;
+            //         pb.finish_with_message("Downloaded!");
+            //     }
+            //     ModelAction::Remove { model_id } => {
+            //         catalog.remove_model(&model_id).await?;
+            //         info!("Model removed: {}", model_id);
+            //     }
+            // }
         }
 
         Commands::Config { action } => {

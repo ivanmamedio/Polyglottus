@@ -4,24 +4,24 @@ members = [
     "crates/domain/pgl-domain",
     "crates/app/pgl-app",
     "crates/adapters/formats/pgl-fmt-core",
-    "crates/adapters/formats/pgl-fmt-patch",
-    "crates/adapters/formats/pgl-fmt-epub",
-    "crates/adapters/formats/pgl-fmt-ooxml",
-    "crates/adapters/formats/pgl-fmt-odf",
+    # "crates/adapters/formats/pgl-fmt-patch",
+    # "crates/adapters/formats/pgl-fmt-epub",
+    # "crates/adapters/formats/pgl-fmt-ooxml",
+    # "crates/adapters/formats/pgl-fmt-odf",
     "crates/adapters/formats/pgl-fmt-text",
-    "crates/adapters/formats/pgl-fmt-pdf",
-    "crates/adapters/formats/pgl-fmt-convert",
+    # "crates/adapters/formats/pgl-fmt-pdf",
+    # "crates/adapters/formats/pgl-fmt-convert",
     "crates/adapters/providers/pgl-provider-openai",
-    "crates/adapters/providers/pgl-provider-ollama",
-    "crates/adapters/providers/pgl-provider-embedded",
-    "crates/adapters/pgl-ocr",
-    "crates/adapters/pgl-storage",
+    # "crates/adapters/providers/pgl-provider-ollama",
+    # "crates/adapters/providers/pgl-provider-embedded",
+    # "crates/adapters/pgl-ocr",
+    # "crates/adapters/pgl-storage",
     "crates/adapters/pgl-secrets",
-    "crates/adapters/pgl-models",
-    "crates/bins/pgl-cli",
-    "crates/bins/pgl-engine",
-    "crates/testing/pgl-testkit",
-    "apps/desktop/src-tauri",
+    # "crates/adapters/pgl-models",
+    # "crates/bins/pgl-cli",
+    # "crates/bins/pgl-engine",
+    # "crates/testing/pgl-testkit",
+    # "apps/desktop/src-tauri",
 ]
 
 [workspace.dependencies]
@@ -40,23 +40,23 @@ async-trait = "0.1"
 pgl-domain = { path = "crates/domain/pgl-domain" }
 pgl-app = { path = "crates/app/pgl-app" }
 pgl-fmt-core = { path = "crates/adapters/formats/pgl-fmt-core" }
-pgl-fmt-patch = { path = "crates/adapters/formats/pgl-fmt-patch" }
-pgl-fmt-epub = { path = "crates/adapters/formats/pgl-fmt-epub" }
+# pgl-fmt-patch = { path = "crates/adapters/formats/pgl-fmt-patch" }
+# pgl-fmt-epub = { path = "crates/adapters/formats/pgl-fmt-epub" }
 pgl-fmt-ooxml = { path = "crates/adapters/formats/pgl-fmt-ooxml" }
 pgl-fmt-odf = { path = "crates/adapters/formats/pgl-fmt-odf" }
 pgl-fmt-text = { path = "crates/adapters/formats/pgl-fmt-text" }
-pgl-fmt-pdf = { path = "crates/adapters/formats/pgl-fmt-pdf" }
-pgl-fmt-convert = { path = "crates/adapters/formats/pgl-fmt-convert" }
+# pgl-fmt-pdf = { path = "crates/adapters/formats/pgl-fmt-pdf" }
+# pgl-fmt-convert = { path = "crates/adapters/formats/pgl-fmt-convert" }
 pgl-provider-openai = { path = "crates/adapters/providers/pgl-provider-openai" }
-pgl-provider-ollama = { path = "crates/adapters/providers/pgl-provider-ollama" }
-pgl-provider-embedded = { path = "crates/adapters/providers/pgl-provider-embedded" }
-pgl-ocr = { path = "crates/adapters/pgl-ocr" }
-pgl-storage = { path = "crates/adapters/pgl-storage" }
+# pgl-provider-ollama = { path = "crates/adapters/providers/pgl-provider-ollama" }
+# pgl-provider-embedded = { path = "crates/adapters/providers/pgl-provider-embedded" }
+# pgl-ocr = { path = "crates/adapters/pgl-ocr" }
+# pgl-storage = { path = "crates/adapters/pgl-storage" }
 pgl-secrets = { path = "crates/adapters/pgl-secrets" }
-pgl-models = { path = "crates/adapters/pgl-models" }
+# pgl-models = { path = "crates/adapters/pgl-models" }
 pgl-cli = { path = "crates/bins/pgl-cli" }
-pgl-engine = { path = "crates/bins/pgl-engine" }
-pgl-testkit = { path = "crates/testing/pgl-testkit" }
+# pgl-engine = { path = "crates/bins/pgl-engine" }
+# pgl-testkit = { path = "crates/testing/pgl-testkit" }
 polyglottus-desktop = { path = "apps/desktop/src-tauri" }
 
 # Config
@@ -90,7 +90,7 @@ ocrs = { version = "0.13", features = ["onnx"] }
 ort = { version = "2.0.0-rc.15", features = ["cuda", "api-17"] }
 
 # Inference
-llama-cpp-2 = { version = "0.1.160", features = ["cuda"] }
+llama-cpp-2 = { version = "0.1.160", features = [] }
 reqwest = { version = "0.12", features = ["json", "rustls-tls", "stream"] }
 
 # Testing
@@ -101,6 +101,7 @@ tempfile = "3.8"
 fake = "3.0"
 csv = "1.3"
 regex = "1.10"
+md5 = "0.3"
 
 # Tauri
 tauri = { version = "2" }

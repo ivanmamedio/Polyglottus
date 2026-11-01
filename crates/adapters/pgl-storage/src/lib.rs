@@ -37,7 +37,7 @@ impl SqliteRepository {
 
         let db_url = format!("sqlite:{}?mode=rwc", db_path.display());
         let pool = SqlitePool::connect(&db_url).await
-            .map_err(|e| StorageError::Database(e.into()))?;
+            .map_err(|e| StorageError::Sqlx(e.into()))?;
 
         // Executa migrações
         Self::run_migrations(&pool).await?;
@@ -63,7 +63,7 @@ impl SqliteRepository {
 #[async_trait]
 impl ProjectRepository for SqliteRepository {
     async fn save_project(&self, project: &Project) -> Result<(), StorageError> {
-        let mut tx = self.pool.begin().await.map_err(|e| StorageError::Database(e.into()))?;
+        let mut tx = self.pool.begin().await.map_err(|e| StorageError::Sqlx(e.into()))?;
 
         // Upsert project
         sqlx::query!(
@@ -93,9 +93,9 @@ impl ProjectRepository for SqliteRepository {
         )
         .execute(&mut *tx)
         .await
-        .map_err(|e| StorageError::Database(e.into()))?;
+        .map_err(|e| StorageError::Sqlx(e.into()))?;
 
-        tx.commit().await.map_err(|e| StorageError::Database(e.into()))?;
+        tx.commit().await.map_err(|e| StorageError::Sqlx(e.into()))?;
         Ok(())
     }
 
@@ -106,7 +106,7 @@ impl ProjectRepository for SqliteRepository {
         )
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| StorageError::Database(e.into()))?;
+        .map_err(|e| StorageError::Sqlx(e.into()))?;
 
         if let Some(row) = row {
             let project = Project {
@@ -121,8 +121,8 @@ impl ProjectRepository for SqliteRepository {
                 updated_at: std::time::UNIX_EPOCH + std::time::Duration::from_secs(row.updated_at as u64),
                 metadata: serde_json::from_str(&row.metadata).unwrap_or_default(),
                 jobs: HashMap::new(), // Carregado separadamente
-                global_glossary: row.global_glossary.map(|g| serde_json::from_str(&g).unwrap()),
-                global_style_guide: row.global_style_guide.map(|g| serde_json::from_str(&g).unwrap()),
+                global_glossary: row.global_glossary.map(|g| serde_json::from_str(g).unwrap()),
+                global_style_guide: row.global_style_guide.map(|g| serde_json::from_str(g).unwrap()),
             };
             Ok(Some(project))
         } else {
@@ -134,7 +134,7 @@ impl ProjectRepository for SqliteRepository {
         sqlx::query!("DELETE FROM projects WHERE id = ?", id.to_string())
             .execute(&self.pool)
             .await
-            .map_err(|e| StorageError::Database(e.into()))?;
+            .map_err(|e| StorageError::Sqlx(e.into()))?;
         Ok(())
     }
 
@@ -144,7 +144,7 @@ impl ProjectRepository for SqliteRepository {
         )
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| StorageError::Database(e.into()))?;
+        .map_err(|e| StorageError::Sqlx(e.into()))?;
 
         Ok(rows.into_iter().map(|row| ProjectSummary {
             id: Uuid::parse_str(&row.id).unwrap(),
@@ -158,7 +158,7 @@ impl ProjectRepository for SqliteRepository {
     }
 
     async fn save_job(&self, job: &Job) -> Result<(), StorageError> {
-        let mut tx = self.pool.begin().await.map_err(|e| StorageError::Database(e.into()))?;
+        let mut tx = self.pool.begin().await.map_err(|e| StorageError::Sqlx(e.into()))?;
 
         sqlx::query!(
             r#"
@@ -191,9 +191,9 @@ impl ProjectRepository for SqliteRepository {
         )
         .execute(&mut *tx)
         .await
-        .map_err(|e| StorageError::Database(e.into()))?;
+        .map_err(|e| StorageError::Sqlx(e.into()))?;
 
-        tx.commit().await.map_err(|e| StorageError::Database(e.into()))?;
+        tx.commit().await.map_err(|e| StorageError::Sqlx(e.into()))?;
         Ok(())
     }
 
@@ -204,7 +204,7 @@ impl ProjectRepository for SqliteRepository {
         )
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| StorageError::Database(e.into()))?;
+        .map_err(|e| StorageError::Sqlx(e.into()))?;
 
         if let Some(row) = row {
             let job = Job {
@@ -235,7 +235,7 @@ impl ProjectRepository for SqliteRepository {
         )
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| StorageError::Database(e.into()))?;
+        .map_err(|e| StorageError::Sqlx(e.into()))?;
 
         Ok(rows.into_iter().map(|row| {
             let config: serde_json::Value = serde_json::from_str(&row.config).unwrap();
@@ -282,7 +282,7 @@ impl ProjectRepository for SqliteRepository {
         )
         .execute(&self.pool)
         .await
-        .map_err(|e| StorageError::Database(e.into()))?;
+        .map_err(|e| StorageError::Sqlx(e.into()))?;
         Ok(())
     }
 
@@ -293,7 +293,7 @@ impl ProjectRepository for SqliteRepository {
         )
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| StorageError::Database(e.into()))?;
+        .map_err(|e| StorageError::Sqlx(e.into()))?;
 
         if let Some(row) = row {
             let unit = Unit {
@@ -303,7 +303,7 @@ impl ProjectRepository for SqliteRepository {
                 text: serde_json::from_str(&row.text).unwrap(),
                 section: SectionId(Uuid::parse_str(&row.section).unwrap()),
                 state: serde_json::from_str(&row.state).unwrap(),
-                translation: row.translation.map(|t| serde_json::from_str(&t).unwrap()),
+                translation: row.translation.map(|t| serde_json::from_str(t).unwrap()),
                 qa_warnings: serde_json::from_str(&row.qa_warnings).unwrap(),
                 retry_count: row.retry_count as u32,
                 metadata: serde_json::from_str(&row.metadata).unwrap(),
@@ -323,7 +323,7 @@ impl ProjectRepository for SqliteRepository {
         )
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| StorageError::Database(e.into()))?;
+        .map_err(|e| StorageError::Sqlx(e.into()))?;
 
         Ok(rows.into_iter().map(|row| Unit {
             id: Uuid::parse_str(&row.id).unwrap().into(),
@@ -332,7 +332,7 @@ impl ProjectRepository for SqliteRepository {
             text: serde_json::from_str(&row.text).unwrap(),
             section: SectionId(Uuid::parse_str(&row.section).unwrap()),
             state: serde_json::from_str(&row.state).unwrap(),
-            translation: row.translation.map(|t| serde_json::from_str(&t).unwrap()),
+            translation: row.translation.map(|t| serde_json::from_str(t).unwrap()),
             qa_warnings: serde_json::from_str(&row.qa_warnings).unwrap(),
             retry_count: row.retry_count as u32,
             metadata: serde_json::from_str(&row.metadata).unwrap(),
@@ -347,7 +347,7 @@ impl ProjectRepository for SqliteRepository {
         )
         .execute(&self.pool)
         .await
-        .map_err(|e| StorageError::Database(e.into()))?;
+        .map_err(|e| StorageError::Sqlx(e.into()))?;
         Ok(())
     }
 
@@ -360,7 +360,7 @@ impl ProjectRepository for SqliteRepository {
         )
         .execute(&self.pool)
         .await
-        .map_err(|e| StorageError::Database(e.into()))?;
+        .map_err(|e| StorageError::Sqlx(e.into()))?;
         Ok(())
     }
 }

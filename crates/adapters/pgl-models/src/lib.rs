@@ -318,7 +318,7 @@ impl ModelCatalog for ModelCatalogImpl {
             languages: entry.map(|e| e.languages.clone()).unwrap_or_default(),
             max_context: 8192,
             is_local: true,
-            size_gb: Some(metadata.len() as f64 / (1024.0 * 1024.0 * 1024.0)),
+            size_gb: Some((metadata.len() as f64 / (1024.0 * 1024.0 * 1024.0)) as f32),
             license: entry.map(|e| e.license.clone()),
         })
     }

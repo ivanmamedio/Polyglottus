@@ -15,19 +15,18 @@ tauri-plugin-sql = { workspace = true }
 
 pgl-app = { workspace = true }
 pgl-domain = { workspace = true }
-pgl-fmt-epub = { workspace = true }
-pgl-fmt-ooxml = { workspace = true }
-pgl-fmt-odf = { workspace = true }
-pgl-fmt-text = { workspace = true }
-pgl-fmt-pdf = { workspace = true }
-pgl-fmt-convert = { workspace = true }
+# pgl-fmt-text = { workspace = true }
+# pgl-fmt-pdf = { workspace = true }
+# pgl-fmt-epub = { workspace = true }
+# pgl-fmt-ooxml = { workspace = true }
+# pgl-fmt-odf = { workspace = true }
+# pgl-fmt-convert = { workspace = true }
 pgl-provider-openai = { workspace = true }
-pgl-provider-ollama = { workspace = true }
-pgl-provider-embedded = { workspace = true }
-pgl-ocr = { workspace = true }
-pgl-storage = { workspace = true }
+# pgl-provider-ollama = { workspace = true }
+# pgl-provider-embedded = { workspace = true }
+# pgl-ocr = { workspace = true }
+# pgl-storage = { workspace = true }
 pgl-secrets = { workspace = true }
-pgl-models = { workspace = true }
 
 serde = { workspace = true }
 serde_json = { workspace = true }

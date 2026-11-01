@@ -8,7 +8,7 @@ license = "MIT OR Apache-2.0"
 [dependencies]
 pgl-app = { workspace = true }
 pgl-domain = { workspace = true }
-llama-cpp-2 = { workspace = true, features = ["cuda"] }
+llama-cpp-2 = { workspace = true }
 async-trait = { workspace = true }
 thiserror = { workspace = true }
 serde = { workspace = true }
