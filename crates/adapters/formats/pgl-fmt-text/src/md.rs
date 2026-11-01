@@ -69,7 +69,7 @@ pub async fn open_md(path: &Path) -> Result<SourceDoc, FormatError> {
                     *idx += 1;
                 }
             }
-            NodeValue::ListItem => {
+            NodeValue::Item(_) => {
                 let text = node_to_text(node);
                 if !text.trim().is_empty() {
                     let unit_id = UnitId::new();
@@ -93,23 +93,22 @@ pub async fn open_md(path: &Path) -> Result<SourceDoc, FormatError> {
         }
     }
 
-    fn node_to_text(node: &comrak::nodes::AstNode) -> String {
-        let mut text = String::new();
-        fn collect(node: &comrak::nodes::AstNode, text: &mut String) {
-            match &node.data.borrow().value {
-                NodeValue::Text(content) | NodeValue::Code(content) => text.push_str(content),
-                NodeValue::SoftBreak | NodeValue::LineBreak => text.push(' '),
-                _ => {}
-            }
-            for child in node.children() {
-                collect(child, text);
-            }
+    fn node_to_text<'a>(node: &'a comrak::nodes::AstNode<'a>) -> String {
+    fn collect<'a>(node: &'a comrak::nodes::AstNode<'a>, text: &mut String) {
+        match &node.data.borrow().value {
+            NodeValue::Text(content) => text.push_str(content),
+            NodeValue::Code(content) => text.push_str(&content.literal),
+            NodeValue::SoftBreak | NodeValue::LineBreak => text.push(' '),
+            _ => {}
         }
-        collect(node, &mut text);
-        text
+        for child in node.children() {
+            collect(child, text);
+        }
     }
-
-    walk(root, &mut units, section, &mut idx, &path.file_name().unwrap_or_default().to_string_lossy());
+    let mut text = String::new();
+    collect(node, &mut text);
+    text
+}
 
     let fidelity = default_zip_fidelity()
         .with_preserved("Estrutura de headings, parágrafos, listas")
@@ -138,27 +137,31 @@ pub async fn write_md(
 
     // Rebuild with translations
     let mut output = String::new();
-    fn rebuild(node: &comrak::nodes::AstNode, translations: &dyn TranslationLookup, output: &mut String, options: &ExportOptions, idx: &mut usize) {
+    fn rebuild<'a>(node: &'a comrak::nodes::AstNode<'a>, translations: &dyn TranslationLookup, output: &mut String, options: &ExportOptions, idx: &mut usize) {
         match &node.data.borrow().value {
-            NodeValue::Paragraph | NodeValue::Heading(_) | NodeValue::CodeBlock(_) | NodeValue::ListItem => {
-                let unit_id = UnitId::from_hash(&{
+            NodeValue::Paragraph | NodeValue::Heading(_) | NodeValue::CodeBlock(_) | NodeValue::Item(_) => {
+                let unit_id = UnitId::from_hash({
                     use std::hash::{Hash, Hasher};
                     let mut hasher = std::collections::hash_map::DefaultHasher::new();
                     format!("{:?}", node.data.borrow().value).hash(&mut hasher);
                     idx.hash(&mut hasher);
-                    hasher.finish().to_le_bytes()
+                    hasher.finish()
                 });
 
                 if let Some(translated) = translations.get(&unit_id) {
                     output.push_str(&translated.raw);
                 } else {
                     // Fallback: render original
-                    comrak::format_commonmark(node, &mut output, &ComrakOptions::default()).ok();
+                    let mut output_buf = Vec::new();
+                    comrak::format_commonmark(node, &ComrakOptions::default(), &mut output_buf).ok();
+                    output.push_str(String::from_utf8_lossy(&output_buf).as_ref());
                 }
                 *idx += 1;
             }
             _ => {
-                comrak::format_commonmark(node, &mut output, &ComrakOptions::default()).ok();
+                let mut output_buf = Vec::new();
+                comrak::format_commonmark(node, &ComrakOptions::default(), &mut output_buf).ok();
+                output.push_str(String::from_utf8_lossy(&output_buf).as_ref());
             }
         }
 

@@ -35,6 +35,10 @@ impl FormatReader for TxtReader {
         FormatId::TXT
     }
 
+    fn extensions(&self) -> &'static [&'static str] {
+        &[".txt", ".text"]
+    }
+
     fn sniff(&self, name: &str, head: &[u8]) -> Confidence {
         let ext_match = name.ends_with(".txt") || name.ends_with(".text");
         let text_match = head.iter().all(|&b| b.is_ascii_graphic() || b.is_ascii_whitespace() || b == b'\n' || b == b'\r');
@@ -97,6 +101,10 @@ impl MdReader {
 impl FormatReader for MdReader {
     fn id(&self) -> FormatId {
         FormatId::MD
+    }
+
+    fn extensions(&self) -> &'static [&'static str] {
+        &[".md", ".markdown", ".mdown", ".mkd"]
     }
 
     fn sniff(&self, name: &str, head: &[u8]) -> Confidence {
@@ -299,6 +307,10 @@ impl FormatReader for HtmlTextReader {
         FormatId::HTML
     }
 
+    fn extensions(&self) -> &'static [&'static str] {
+        &[".html", ".htm", ".xhtml"]
+    }
+
     fn sniff(&self, name: &str, head: &[u8]) -> Confidence {
         let ext_match = name.ends_with(".html") || name.ends_with(".htm") || name.ends_with(".xhtml");
         let html_match = head.windows(7).any(|w| w == b"<html") || head.windows(9).any(|w| w == b"<!DOCTYPE");
@@ -361,6 +373,10 @@ impl PoReader {
 impl FormatReader for PoReader {
     fn id(&self) -> FormatId {
         FormatId::PO
+    }
+
+    fn extensions(&self) -> &'static [&'static str] {
+        &[".po", ".pot"]
     }
 
     fn sniff(&self, name: &str, head: &[u8]) -> Confidence {

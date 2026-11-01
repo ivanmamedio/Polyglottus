@@ -205,6 +205,6 @@ mod tests {
         let (fmt, conf) = sniffer.sniff(Path::new("test.txt"), b"plain text");
 
         assert_eq!(fmt, FormatId::TXT);
-        assert_eq!(conf.value(), 75); // high
+        assert_eq!(conf.value(), 100); // certain (MIME type matches)
     }
 }

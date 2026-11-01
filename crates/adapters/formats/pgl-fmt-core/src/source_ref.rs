@@ -127,6 +127,7 @@ mod tests {
         let mut registry = SourceRefRegistry::new();
         let id1 = UnitId::new();
         let id2 = UnitId::new();
+        let id3 = UnitId::new();
 
         let ref1 = source_ref_from_xpath("ch1.xhtml", "//p[1]");
         let ref2 = source_ref_from_xpath("ch1.xhtml", "//p[2]");
@@ -144,16 +145,16 @@ mod tests {
 
     #[test]
     fn normalize_selector() {
-        assert_eq!(normalize_selector("//p[1]"), "p[1]");
-        assert_eq!(normalize_selector("/html/body/p"), "html/body/p");
-        assert_eq!(normalize_selector("  //div  "), "div");
+        assert_eq!(super::normalize_selector("//p[1]"), "p[1]");
+        assert_eq!(super::normalize_selector("/html/body/p"), "html/body/p");
+        assert_eq!(super::normalize_selector("  //div  "), "div");
     }
 
     #[test]
     fn extract_index() {
-        assert_eq!(extract_index("//p[1]"), Some(1));
-        assert_eq!(extract_index("//p[42]"), Some(42));
-        assert_eq!(extract_index("//p[last()]"), None);
-        assert_eq!(extract_index("p"), None);
+        assert_eq!(super::extract_index("//p[1]"), Some(1));
+        assert_eq!(super::extract_index("//p[42]"), Some(42));
+        assert_eq!(super::extract_index("//p[last()]"), None);
+        assert_eq!(super::extract_index("p"), None);
     }
 }

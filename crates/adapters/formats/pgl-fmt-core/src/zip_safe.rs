@@ -179,9 +179,10 @@ mod tests {
 
     #[test]
     fn create_and_read_zip() {
-        let mut f = NamedTempFile::new().unwrap();
+        let f = NamedTempFile::new().unwrap();
         {
-            let mut zip = create_zip_safe(f.path()).unwrap();
+            let file = File::create(f.path()).unwrap();
+            let mut zip = create_zip_safe(file).unwrap();
             add_entry_safe(&mut zip, "test.txt", b"Hello world").unwrap();
             add_entry_safe(&mut zip, "dir/nested.txt", b"Nested").unwrap();
             zip.finish().unwrap();
@@ -196,9 +197,10 @@ mod tests {
 
     #[test]
     fn zip_slip_prevention() {
-        let mut f = NamedTempFile::new().unwrap();
+        let f = NamedTempFile::new().unwrap();
         {
-            let mut zip = create_zip_safe(f.path()).unwrap();
+            let file = File::create(f.path()).unwrap();
+            let mut zip = create_zip_safe(file).unwrap();
             // Tenta adicionar arquivo com path traversal
             let result = add_entry_safe(&mut zip, "../etc/passwd", b"evil");
             assert!(result.is_err());
@@ -213,9 +215,10 @@ mod tests {
     #[test]
     fn compression_ratio_check() {
         // Cria arquivo altamente comprimido (zip bomb simulado)
-        let mut f = NamedTempFile::new().unwrap();
+        let f = NamedTempFile::new().unwrap();
         {
-            let mut zip = create_zip_safe(f.path()).unwrap();
+            let file = File::create(f.path()).unwrap();
+            let mut zip = create_zip_safe(file).unwrap();
             // 10 MB de zeros comprime para ~100 bytes
             let large_content = vec![0u8; 10_000_000];
             add_entry_safe(&mut zip, "bomb.txt", &large_content).unwrap();
@@ -223,7 +226,7 @@ mod tests {
         }
 
         // Deve falhar na abertura devido ao ratio
-        let result = open_zip_safe(f.path());
+        let _result = open_zip_safe(f.path());
         // Nota: zip::CompressionMethod::Stored não comprime, então este teste
         // depende do método de compressão usado. Em produção, usar Deflated.
     }
