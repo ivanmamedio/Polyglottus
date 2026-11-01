@@ -19,6 +19,9 @@ tracing = { workspace = true }
 [dev-dependencies]
 insta = { workspace = true }
 mockito = "1.2"
+uuid = { workspace = true }
+tempfile = { workspace = true }
+tokio = { workspace = true, features = ["test-util"] }
 
 [lib]
 name = "pgl_provider_openai"
