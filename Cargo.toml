@@ -4,7 +4,7 @@ members = [
     "crates/domain/pgl-domain",
     "crates/app/pgl-app",
     "crates/adapters/formats/pgl-fmt-core",
-    # "crates/adapters/formats/pgl-fmt-patch",
+    "crates/adapters/formats/pgl-fmt-patch",
     "crates/adapters/formats/pgl-fmt-epub",
     "crates/adapters/formats/pgl-fmt-ooxml",
     "crates/adapters/formats/pgl-fmt-odf",

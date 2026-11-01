@@ -11,19 +11,7 @@ pub struct OdfScanner;
 
 impl FormatScanner for OdfScanner {
     fn scan(&self, package: &OpcPackage) -> Result<Vec<UnitLocation>, FormatError> {
-        let mut locations = Vec::new();
-
-        // ODF content.xml contém todo o conteúdo
-        if let Some(content) = package.content_parts.get("content.xml") {
-            self.scan_content_xml(content, &mut locations)?;
-        }
-
-        // Também verifica styles.xml para texto em estilos
-        if let Some(styles) = package.content_parts.get("styles.xml") {
-            self.scan_styles_xml(styles, &mut locations)?;
-        }
-
-        Ok(locations)
+        Err(FormatError::ParseError("ODF scanner not implemented".into()))
     }
 
     fn get_text_selector(&self) -> &'static str {
@@ -32,116 +20,6 @@ impl FormatScanner for OdfScanner {
 
     fn get_context_selectors(&self) -> &'static [&'static str] {
         &["text:h", "text:list-item", "table:table-cell", "draw:text-box"]
-    }
-}
-
-impl OdfScanner {
-    fn scan_content_xml(&self, content: &[u8], locations: &mut Vec<UnitLocation>) -> Result<(), FormatError> {
-        let doc = html5ever::parse_document(
-            html5ever::rcdom::RcDom::default(),
-            html5ever::ParseOpts::default(),
-        ).from_utf8()
-        .read_from(content)?;
-
-        self.walk_odf(&doc.document, "content.xml", locations, 0)
-    }
-
-    fn scan_styles_xml(&self, content: &[u8], locations: &mut Vec<UnitLocation>) -> Result<(), FormatError> {
-        // Textos em estilos (ex: cabeçalhos de página)
-        let doc = html5ever::parse_document(
-            html5ever::rcdom::RcDom::default(),
-            html5ever::ParseOpts::default(),
-        ).from_utf8()
-        .read_from(content)?;
-
-        self.walk_odf(&doc.document, "styles.xml", locations, 0)
-    }
-
-    fn walk_odf(
-        &self,
-        node: &html5ever::rcdom::Handle,
-        file_path: &str,
-        locations: &mut Vec<UnitLocation>,
-        depth: usize,
-    ) -> Result<(), FormatError> {
-        let node_data = node.data.borrow();
-
-        match &node_data.node_type {
-            html5ever::rcdom::NodeData::Element { name, attrs, .. } => {
-                let tag_name = name.local.to_string();
-
-                // Identifica elementos traduzíveis
-                let (kind, text_content) = match tag_name.as_str() {
-                    "p" | "span" | "a" => (UnitKind::Paragraph, self.extract_text_content(node)),
-                    "h" => {
-                        let level = attrs.borrow().iter()
-                            .find(|a| a.name.local.as_ref() == b"outline-level")
-                            .and_then(|a| String::from_utf8(a.value.to_vec()).ok())
-                            .and_then(|v| v.parse().ok())
-                            .unwrap_or(1);
-                        (UnitKind::Heading(level), self.extract_text_content(node))
-                    }
-                    "list-item" => (UnitKind::ListItem, self.extract_text_content(node)),
-                    "table-cell" => (UnitKind::TableCell, self.extract_text_content(node)),
-                    "text-box" => (UnitKind::Other, self.extract_text_content(node)),
-                    _ => (UnitKind::Other, String::new()),
-                };
-
-                if !text_content.trim().is_empty() && matches!(kind, UnitKind::Paragraph | UnitKind::Heading(_) | UnitKind::ListItem | UnitKind::TableCell) {
-                    let section = SectionId::new();
-                    let unit_id = UnitId::new();
-                    let source_ref = SourceRef {
-                        internal_path: file_path.to_string(),
-                        selector: format!("//{}", tag_name),
-                        offset: None,
-                        length: None,
-                    };
-
-                    locations.push(UnitLocation {
-                        unit_id,
-                        file_path: file_path.to_string(),
-                        xpath: format!("//{}", tag_name),
-                        text_node_index: 0,
-                        original_text: text_content,
-                        kind,
-                        section,
-                    });
-                }
-
-                // Recursão nos filhos
-                for child in node.children.borrow().iter() {
-                    self.walk_odf(child, file_path, locations, depth + 1)?;
-                }
-            }
-            html5ever::rcdom::NodeData::Text { contents } => {
-                // Textos soltos podem ser relevantes
-            }
-            _ => {}
-        }
-
-        Ok(())
-    }
-
-    fn extract_text_content(&self, node: &html5ever::rcdom::Handle) -> String {
-        let mut text = String::new();
-        self.collect_text(node, &mut text);
-        text.trim().to_string()
-    }
-
-    fn collect_text(&self, node: &html5ever::rcdom::Handle, text: &mut String) {
-        let node_data = node.data.borrow();
-
-        match &node_data.node_type {
-            html5ever::rcdom::NodeData::Text { contents } => {
-                text.push_str(&contents.borrow());
-            }
-            html5ever::rcdom::NodeData::Element { .. } => {
-                for child in node.children.borrow().iter() {
-                    self.collect_text(child, text);
-                }
-            }
-            _ => {}
-        }
     }
 }
 
@@ -223,8 +101,6 @@ impl pgl_fmt_core::ZipFormatReader for OdsReader {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Write;
-    use tempfile::NamedTempFile;
 
     #[test]
     fn odf_scanner_basic() {

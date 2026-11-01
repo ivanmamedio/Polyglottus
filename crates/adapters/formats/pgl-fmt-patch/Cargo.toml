@@ -14,8 +14,7 @@ quick-xml = { workspace = true }
 thiserror = { workspace = true }
 anyhow = { workspace = true }
 serde = { workspace = true }
-html5ever = { workspace = true }
-scraper = { workspace = true }
+async-trait = { workspace = true }
 
 [dev-dependencies]
 insta = { workspace = true }

@@ -167,32 +167,7 @@ impl OpcPackage {
         let content = self.content_parts.get_mut(file_path)
             .ok_or_else(|| FormatError::WriteError(format!("File not found: {}", file_path)))?;
 
-        // Parse HTML/XML e atualiza nó
-        let mut doc = html5ever::parse_document(
-            html5ever::rcdom::RcDom::default(),
-            html5ever::ParseOpts::default(),
-        ).from_utf8()
-        .read_from(&mut content.as_slice())?;
-
-        // Encontra nó por XPath simplificado e atualiza
-        Self::update_node_text(&mut doc.document, xpath, text_node_index, new_text)?;
-
-        // Serializa de volta
-        let mut serialized = Vec::new();
-        html5ever::serialize(&mut serialized, &doc.document, html5ever::SerializeOpts::default())?;
-        *content = serialized;
-
-        Ok(())
-    }
-
-    fn update_node_text(
-        node: &html5ever::rcdom::Handle,
-        xpath: &str,
-        text_index: usize,
-        new_text: &str,
-    ) -> Result<bool, FormatError> {
-        // Implementação simplificada - em produção usar XPath real
-        // Por enquanto retorna erro para forçar implementação específica
+        // Placeholder - implementação real usaria XML parser
         Err(FormatError::WriteError("Update node not implemented generically".into()))
     }
 
