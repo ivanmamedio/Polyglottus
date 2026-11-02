@@ -4,27 +4,173 @@
 #![warn(missing_docs)]
 #![warn(clippy::all, clippy::pedantic, clippy::nursery, clippy::cargo)]
 
-use pgl_app::{ImportBook, PlanTranslation, ExecuteJob, ExportBook, FormatRegistry, SecretStore};
-use pgl_domain::{Language, ExportOptions, OutputFormat, JobConfig};
-// use pgl_fmt_epub::{EpubReader, EpubWriter};
-// use pgl_fmt_ooxml::{DocxReader, DocxWriter, PptxReader, PptxWriter, XlsxReader, XlsxWriter};
-// use pgl_fmt_odf::{OdtReader, OdtWriter, OdpReader, OdpWriter, OdsReader, OdsWriter};
-// use pgl_fmt_text::{TxtReader, TxtWriter, MdReader, MdWriter, SrtReader, SrtWriter, VttReader, VttWriter, HtmlTextReader, HtmlTextWriter, PoReader, PoWriter, XliffReader, XliffWriter, TmxReader, TmxWriter, JsonI18nReader, JsonI18nWriter};
-// use pgl_fmt_pdf::{PdfReflowReader, PdfOverlayWriter};
-// use pgl_fmt_convert::{ConverterRegistry, ConvertReader, ConvertWriter};
-use pgl_provider_openai::OpenAICompatProvider;
-// use pgl_providers_ollama::OllamaProvider;
-// use pgl_providers_embedded::EmbeddedProvider;
-// use pgl_ocr::OcrEngineFactory;
-// use pgl_storage::SqliteRepository;
-use pgl_secrets::SystemSecretStore;
-// use pgl_models::ModelCatalogImpl;
+use async_trait::async_trait;
 use clap::{Parser, Subcommand};
 use indicatif::{ProgressBar, ProgressStyle};
+use pgl_app::{ImportBook, SecretStore, ProjectRepository, TranslationProvider, QaChecker, ExportOptions, OutputFormat, ExportReport, FormatId, TranslateRequest, TranslationLookup, FormatReader, FormatError, SourceDocument};
+use pgl_app::prelude::FormatRegistry;
+use pgl_domain::{Language, UnitId, SectionId, MarkedText, JobState};
+use pgl_fmt_epub::{EpubReader, EpubWriter};
+use pgl_fmt_ooxml::{DocxReader, DocxWriter, PptxReader, PptxWriter, XlsxReader, XlsxWriter};
+use pgl_fmt_odf::{OdtReader, OdtWriter, OdpReader, OdpWriter, OdsReader, OdsWriter};
+use pgl_fmt_text::{TxtReader, TxtWriter, MdReader, MdWriter, SrtReader, SrtWriter, VttReader, VttWriter, PoReader, PoWriter, XliffReader, XliffWriter, TmxReader, TmxWriter, JsonI18nReader, JsonI18nWriter};
+use pgl_fmt_pdf::{PdfReflowReader, PdfOverlayWriter};
+use pgl_fmt_convert::{ConverterRegistry, ConvertReader, ConvertWriter, ConverterType};
+use pgl_provider_openai::OpenAICompatProvider;
+use pgl_provider_ollama::OllamaProvider;
+use pgl_provider_embedded::EmbeddedProvider;
+use pgl_ocr::OcrEngineFactory;
+use pgl_storage::SqliteRepository;
+use pgl_secrets::SystemSecretStore;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
+use uuid::Uuid;
+
+// AnyFormatReader - tries multiple readers until one succeeds
+struct AnyFormatReader {
+    readers: Vec<Arc<dyn FormatReader>>,
+}
+
+impl AnyFormatReader {
+    fn new(readers: Vec<Arc<dyn FormatReader>>) -> Self {
+        Self { readers }
+    }
+}
+
+#[async_trait::async_trait]
+impl FormatReader for AnyFormatReader {
+    fn id(&self) -> FormatId {
+        FormatId("any")
+    }
+
+    fn extensions(&self) -> &'static [&'static str] {
+        &[]
+    }
+
+    fn sniff(&self, name: &str, head: &[u8]) -> pgl_app::Confidence {
+        for reader in &self.readers {
+            let conf = reader.sniff(name, head);
+            if conf > pgl_app::Confidence::none() {
+                return conf;
+            }
+        }
+        pgl_app::Confidence::none()
+    }
+
+    async fn open(&self, path: &std::path::Path) -> Result<Box<dyn SourceDocument + 'static>, FormatError> {
+        for reader in &self.readers {
+            if let Ok(doc) = reader.open(path).await {
+                return Ok(doc);
+            }
+        }
+        Err(FormatError::ParseError("No reader could open the file".into()))
+    }
+}
+
+// Simple inline execution without EventSink trait
+async fn execute_translation(
+    provider: Arc<dyn TranslationProvider>,
+    qa_checker: Arc<dyn QaChecker>,
+    repo: Arc<SqliteRepository>,
+    job_id: Uuid,
+    pb: &ProgressBar,
+) -> anyhow::Result<()> {
+    let mut job = repo.load_job(&job_id).await?
+        .ok_or_else(|| anyhow::anyhow!("Job not found"))?;
+
+    if !matches!(job.state, JobState::Created | JobState::Paused) {
+        return Err(anyhow::anyhow!("Job cannot be started"));
+    }
+
+    job.start();
+    repo.save_job(&job).await?;
+
+    // Loop de processamento em lotes
+    while job.can_resume() {
+        job.update_progress();
+        repo.save_job(&job).await?;
+        pb.set_position(job.progress.completed as u64);
+
+        let batch = job.pending_units(job.config.batch_size);
+        if batch.is_empty() { break; }
+
+        // Collect unit IDs to avoid borrow conflicts
+        let unit_ids: Vec<UnitId> = batch.iter().map(|u| u.id).collect();
+
+        // Prepara requisição
+        let req = TranslateRequest {
+            units: batch.iter().map(|u| (*u).clone()).collect(),
+            lang_pair: job.config.lang_pair.clone(),
+            glossary: job.config.glossary.clone(),
+            style_guide: job.config.style_guide.clone(),
+            context: Some(String::new()),
+            model_id: Some(job.config.model_id.clone()),
+            temperature: Some(job.config.temperature),
+            max_tokens: Some(job.config.max_tokens),
+        };
+
+        // Tradução
+        let response = match provider.translate(req).await {
+            Ok(r) => r,
+            Err(e) => {
+                for unit_id in &unit_ids {
+                    if let Some(u) = job.unit_mut(unit_id) {
+                        u.fail();
+                    }
+                }
+                repo.save_job(&job).await?;
+                return Err(anyhow::anyhow!("Translation failed: {}", e));
+            }
+        };
+
+        // Aplica traduções e QA
+        let lang_pair = job.config.lang_pair.clone();
+        let glossary = job.config.glossary.clone();
+        let enable_qa = job.config.enable_qa;
+
+        let job_id = job.id;
+        for trans in response.translations {
+            if let Some(unit) = job.unit_mut(&trans.unit_id) {
+                unit.apply_translation(trans.translated_text)?;
+
+                if enable_qa {
+                    let qa_result = qa_checker.check(unit, &lang_pair, glossary.as_ref());
+                    if !qa_result.passed {
+                        if qa_result.has_errors {
+                            unit.fail();
+                        } else {
+                            unit.flag(qa_result.warnings.clone());
+                        }
+                    }
+                }
+
+                repo.save_unit(unit, &job_id).await?;
+                pb.inc(1);
+            }
+        }
+
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+    }
+
+    // Verifica se completou
+    if job.progress.completed == job.progress.total {
+        job.complete(ExportReport {
+            output_path: String::new(),
+            format: OutputFormat::SameAsSource,
+            units_processed: job.progress.completed,
+            units_with_warnings: 0,
+            units_failed: job.progress.failed,
+            output_size: 0,
+            export_time_ms: 0,
+            warnings: vec![],
+        });
+        repo.save_job(&job).await?;
+    }
+
+    Ok(())
+}
 
 #[derive(Parser)]
 #[command(name = "pgl-cli")]
@@ -204,69 +350,77 @@ async fn main() -> anyhow::Result<()> {
 
     // Data dir
     let data_dir = cli.data_dir.unwrap_or_else(|| {
-        // dirs::data_dir()
-        //     .unwrap_or_else(|| PathBuf::from("."))
-        PathBuf::from(".")
-            .join("polyglottus")
+        PathBuf::from(".").join("polyglottus")
     });
     std::fs::create_dir_all(&data_dir)?;
 
     // Inicializa componentes
     let db_path = data_dir.join("polyglottus.db");
-    // let repo = Arc::new(SqliteRepository::new(&db_path).await?);
+    let repo = Arc::new(SqliteRepository::new(&db_path).await?);
     let secrets = Arc::new(SystemSecretStore::new("polyglottus"));
-    // let repo = Arc::new(DummyRepository::new());
 
     // Registry de formatos
     let mut fmt_registry = FormatRegistry::new();
-    // fmt_registry.register_reader(Arc::new(EpubReader::new()));
-    // fmt_registry.register_writer(Arc::new(EpubWriter::new()));
-    // fmt_registry.register_reader(Arc::new(DocxReader::new()));
-    // fmt_registry.register_writer(Arc::new(DocxWriter::new()));
-    // fmt_registry.register_reader(Arc::new(PptxReader::new()));
-    // fmt_registry.register_writer(Arc::new(PptxWriter::new()));
-    // fmt_registry.register_reader(Arc::new(XlsxReader::new()));
-    // fmt_registry.register_writer(Arc::new(XlsxWriter::new()));
-    // fmt_registry.register_reader(Arc::new(OdtReader::new()));
-    // fmt_registry.register_writer(Arc::new(OdtWriter::new()));
-    // fmt_registry.register_reader(Arc::new(OdpReader::new()));
-    // fmt_registry.register_writer(Arc::new(OdpWriter::new()));
-    // fmt_registry.register_reader(Arc::new(OdsReader::new()));
-    // fmt_registry.register_writer(Arc::new(OdsWriter::new()));
-    // fmt_registry.register_reader(Arc::new(TxtReader::new()));
+    fmt_registry.register_reader(Arc::new(EpubReader::new()));
+    fmt_registry.register_writer(Arc::new(EpubWriter::new()));
+    fmt_registry.register_reader(Arc::new(DocxReader::new()));
+    fmt_registry.register_writer(Arc::new(DocxWriter::new()));
+    fmt_registry.register_reader(Arc::new(PptxReader::new()));
+    fmt_registry.register_writer(Arc::new(PptxWriter::new()));
+    fmt_registry.register_reader(Arc::new(XlsxReader::new()));
+    fmt_registry.register_writer(Arc::new(XlsxWriter::new()));
+    fmt_registry.register_reader(Arc::new(OdtReader::new()));
+    fmt_registry.register_writer(Arc::new(OdtWriter::new()));
+    fmt_registry.register_reader(Arc::new(OdpReader::new()));
+    fmt_registry.register_writer(Arc::new(OdpWriter::new()));
+    fmt_registry.register_reader(Arc::new(OdsReader::new()));
+    fmt_registry.register_writer(Arc::new(OdsWriter::new()));
+    fmt_registry.register_reader(Arc::new(TxtReader::new()));
     fmt_registry.register_writer(Arc::new(TxtWriter::new()));
-    // fmt_registry.register_reader(Arc::new(MdReader::new()));
-    // fmt_registry.register_writer(Arc::new(MdWriter::new()));
-    // fmt_registry.register_reader(Arc::new(SrtReader::new()));
-    // fmt_registry.register_writer(Arc::new(SrtWriter::new()));
-    // fmt_registry.register_reader(Arc::new(VttReader::new()));
-    // fmt_registry.register_writer(Arc::new(VttWriter::new()));
-    // fmt_registry.register_reader(Arc::new(HtmlTextReader::new()));
-    // fmt_registry.register_writer(Arc::new(HtmlTextWriter::new()));
-    // fmt_registry.register_reader(Arc::new(PoReader::new()));
-    // fmt_registry.register_writer(Arc::new(PoWriter::new()));
-    // fmt_registry.register_reader(Arc::new(XliffReader::new()));
-    // fmt_registry.register_writer(Arc::new(XliffWriter::new()));
-    // fmt_registry.register_reader(Arc::new(TmxReader::new()));
-    // fmt_registry.register_writer(Arc::new(TmxWriter::new()));
-    // fmt_registry.register_reader(Arc::new(JsonI18nReader::new()));
-    // fmt_registry.register_writer(Arc::new(JsonI18nWriter::new()));
-    // fmt_registry.register_reader(Arc::new(PdfReflowReader::new()));
-    // fmt_registry.register_writer(Arc::new(PdfOverlayWriter::new()));
+    fmt_registry.register_reader(Arc::new(MdReader::new()));
+    fmt_registry.register_writer(Arc::new(MdWriter::new()));
+    fmt_registry.register_reader(Arc::new(SrtReader::new()));
+    fmt_registry.register_writer(Arc::new(SrtWriter::new()));
+    fmt_registry.register_reader(Arc::new(VttReader::new()));
+    fmt_registry.register_writer(Arc::new(VttWriter::new()));
+    fmt_registry.register_reader(Arc::new(PoReader::new()));
+    fmt_registry.register_writer(Arc::new(PoWriter::new()));
+    fmt_registry.register_reader(Arc::new(XliffReader::new()));
+    fmt_registry.register_writer(Arc::new(XliffWriter::new()));
+    fmt_registry.register_reader(Arc::new(TmxReader::new()));
+    fmt_registry.register_writer(Arc::new(TmxWriter::new()));
+    fmt_registry.register_reader(Arc::new(JsonI18nReader::new()));
+    fmt_registry.register_writer(Arc::new(JsonI18nWriter::new()));
+    fmt_registry.register_reader(Arc::new(PdfReflowReader::new()));
+    fmt_registry.register_writer(Arc::new(PdfOverlayWriter::new()));
 
     // Conversores
-    // let converter_registry = ConverterRegistry::default();
-    // for converter in converter_registry.converters {
-    //     fmt_registry.register_reader(Arc::new(ConvertReader::new(converter.clone())));
-    //     fmt_registry.register_writer(Arc::new(ConvertWriter::new(converter)));
-    // }
+    let converter_registry = ConverterRegistry::default();
+    for converter in converter_registry.available() {
+        match converter {
+            "pandoc" => {
+                fmt_registry.register_reader(Arc::new(ConvertReader::new(ConverterType::Pandoc)));
+                fmt_registry.register_writer(Arc::new(ConvertWriter::new(ConverterType::Pandoc)));
+            }
+            "calibre" => {
+                fmt_registry.register_reader(Arc::new(ConvertReader::new(ConverterType::Calibre)));
+                fmt_registry.register_writer(Arc::new(ConvertWriter::new(ConverterType::Calibre)));
+            }
+            "libreoffice" => {
+                fmt_registry.register_reader(Arc::new(ConvertReader::new(ConverterType::LibreOffice)));
+                fmt_registry.register_writer(Arc::new(ConvertWriter::new(ConverterType::LibreOffice)));
+            }
+            _ => {}
+        }
+    }
 
     // OCR
-    // let ocr_engine = OcrEngineFactory::create_default().ok();
+    let _ocr_engine = OcrEngineFactory::create_default().ok();
 
     match cli.command {
-        Commands::Import { input, name, target_lang } => {
-            let import = ImportBook::new(fmt_registry.readers().to_vec(), repo.clone());
+        Commands::Import { input, name, target_lang: _ } => {
+            let any_reader = Arc::new(AnyFormatReader::new(fmt_registry.readers().to_vec()));
+            let import = ImportBook::new(vec![any_reader], repo.clone());
             let project = import.execute(&input, name).await?;
             info!("Project created: {} ({})", project.name, project.id);
         }
@@ -279,54 +433,62 @@ async fn main() -> anyhow::Result<()> {
         }
 
         Commands::Info { id } => {
-            let project_id = uuid::Uuid::parse_str(&id)?;
+            let project_id = Uuid::parse_str(&id)?;
             if let Some(project) = repo.load_project(&project_id).await? {
                 println!("Name: {}", project.name);
                 println!("Source: {} ({})", project.source_file.display(), project.source_format);
                 println!("Language: {:?}", project.detected_language);
-                println!("Units: {}", project.total_units());
-                println!("Progress: {}%", project.overall_progress());
+                println!("Jobs: {}", project.jobs.len());
             } else {
                 eprintln!("Project not found");
             }
         }
 
         Commands::Translate { project, job, provider, model, url, api_key, model_path, target_lang, output_format, bilingual, batch_size, max_parallel } => {
-            let project_id = uuid::Uuid::parse_str(&project)?;
+            let project_id = Uuid::parse_str(&project)?;
             let proj = repo.load_project(&project_id).await?
                 .ok_or_else(|| anyhow::anyhow!("Project not found"))?;
 
             let job_id = if let Some(j) = job {
-                uuid::Uuid::parse_str(&j)?
+                Uuid::parse_str(&j)?
             } else {
-                proj.active_job().map(|j| j.id).ok_or_else(|| anyhow::anyhow!("No active job"))?
+                proj.jobs.values().find(|j| matches!(j.state, JobState::Created | JobState::Running | JobState::Paused))
+                    .map(|j| j.id)
+                    .ok_or_else(|| anyhow::anyhow!("No active job"))?
             };
 
-            // Cria provedor
-            let translation_provider: Arc<dyn pgl_app::TranslationProvider> = match provider.as_str() {
+            let openai_key = if provider == "openai" {
+                secrets.get("openai").await.unwrap_or(None).unwrap_or_default()
+            } else {
+                String::new()
+            };
+            let api_key_final = api_key.unwrap_or(openai_key);
+
+            let translation_provider: Arc<dyn TranslationProvider> = match provider.as_str() {
                 "openai" => {
-                    let key = api_key.unwrap_or_else(|| secrets.get("openai").await.unwrap_or(None).unwrap_or_default());
-                    let mut p = OpenAICompatProvider::openai(key)?;
-                    if let Some(u) = url { p.config.base_url = u; }
-                    if let Some(m) = model { p.default_model = m; }
+                    let mut config = pgl_provider_openai::OpenAICompatConfig::default();
+                    config.api_key = Some(api_key_final);
+                    if let Some(u) = url { config.base_url = u; }
+                    let mut p = OpenAICompatProvider::new(config)?;
+                    if let Some(ref m) = model { p = p.with_model(m.to_string()); }
                     Arc::new(p)
                 }
                 "ollama" => {
-                    // let mut p = OllamaProvider::new(pgl_providers_ollama::OllamaConfig {
-                    //     base_url: url.unwrap_or_else(|| "http://localhost:11434".into()),
-                    //     ..Default::default()
-                    // })?;
-                    // if let Some(m) = model { p.default_model = m; }
-                    // Arc::new(p)
-                    anyhow::bail!("Ollama provider not available (pgl-provider-ollama not compiled)")
+                    let mut config = pgl_provider_ollama::OllamaConfig {
+                        base_url: url.unwrap_or_else(|| "http://localhost:11434".into()),
+                        ..Default::default()
+                    };
+                    let mut p = OllamaProvider::new(config)?;
+                    if let Some(ref m) = model { p = p.with_model(m.to_string()); }
+                    Arc::new(p)
                 }
                 "embedded" => {
-                    // let path = model_path.ok_or_else(|| anyhow::anyhow!("model_path required for embedded provider"))?;
-                    // let mut p = EmbeddedProvider::new(pgl_providers_embedded::EmbeddedConfig::default())
-                    //     .with_model_path(path);
-                    // p.load_model()?;
-                    // Arc::new(p)
-                    anyhow::bail!("Embedded provider not available (pgl-provider-embedded not compiled)")
+                    let path = model_path.ok_or_else(|| anyhow::anyhow!("model_path required for embedded provider"))?;
+                    let path_str = path.to_string_lossy().to_string();
+                    let mut p = EmbeddedProvider::new(pgl_provider_embedded::EmbeddedConfig::default())?
+                        .with_model_path(path_str);
+                    p.load_model()?;
+                    Arc::new(p)
                 }
                 _ => anyhow::bail!("Unknown provider: {}", provider),
             };
@@ -357,10 +519,7 @@ async fn main() -> anyhow::Result<()> {
             });
 
             // Planeja
-            // let planner = PlanTranslation::new(Arc::new(catalog));
-            // let plan = planner.execute(&job).await?;
-            // info!("Plan: {} units, ~{}s, model: {}", plan.total_units, plan.estimated_time_secs, plan.recommended_model.model_id);
-            info!("Translation started (planner not available without pgl-models)");
+            info!("Translation started");
 
             // Executa com progress bar
             let pb = ProgressBar::new(job.units.len() as u64);
@@ -368,15 +527,14 @@ async fn main() -> anyhow::Result<()> {
                 .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({percent}%) ETA: {eta}")
                 .unwrap());
 
-            let events = Arc::new(CliEventSink { pb: pb.clone() });
-            let executor = ExecuteJob::new(translation_provider, Arc::new(pgl_domain::QaChecker::new(Default::default())), repo.clone(), events);
-            executor.execute(job_id).await?;
+            let qa_checker = Arc::new(pgl_domain::QaChecker::new(Default::default()));
+            execute_translation(translation_provider, qa_checker, repo.clone(), job_id, &pb).await?;
 
             pb.finish_with_message("Translation completed!");
         }
 
         Commands::Export { job, output, format, bilingual } => {
-            let job_id = uuid::Uuid::parse_str(&job)?;
+            let job_id = Uuid::parse_str(&job)?;
             let export_options = ExportOptions {
                 output_format: match format.as_str() {
                     "same" => OutputFormat::SameAsSource,
@@ -394,53 +552,16 @@ async fn main() -> anyhow::Result<()> {
 
             // Encontra writer
             let writer = fmt_registry.writers().iter()
-                .find(|w| w.id() == export_options.output_format.into() || w.id() == pgl_app::FormatId("any"))
+                .find(|w| w.id().0 == format!("{:?}", export_options.output_format) || w.id() == FormatId("any"))
                 .ok_or_else(|| anyhow::anyhow!("No writer for format"))?;
 
             let report = writer.write(&PathBuf::new(), &CliTranslationLookup { repo: repo.clone(), job_id }, &export_options, &output).await?;
             info!("Exported to: {} ({} bytes)", report.output_path, report.output_size);
         }
 
-        Commands::Models { action } => {
+        Commands::Models { action: _ } => {
             // Models commands require pgl-models crate
             eprintln!("Models commands not available (pgl-models not compiled)");
-            // match action {
-            //     ModelAction::List => {
-            //         let models = catalog.list_installed().await?;
-            //         for m in models {
-            //             println!("{} - {:.1} GB", m.id, m.size_gb.unwrap_or(0.0));
-            //         }
-            //     }
-            //     ModelAction::Recommend { target_lang } => {
-            //         let hw = catalog.detect_hardware().await?;
-            //         let rec = catalog.recommend_model(&hw, &pgl_domain::LangPair {
-            //             source: Language::new("auto"),
-            //             target: Language::new(target_lang),
-            //         }).await?;
-            //         println!("Recommended: {}", rec.model_id);
-            //         println!("Reason: {}", rec.reason);
-            //         println!("Speed: {}", rec.estimated_speed);
-            //         println!("RAM: {:.1} GB", rec.estimated_ram_gb);
-            //         println!("Quality: {:?}", rec.quality_tier);
-            //         println!("Size: {:.1} GB", rec.download_size_gb);
-            //         println!("License: {}", rec.license);
-            //     }
-            //     ModelAction::Download { model_id } => {
-            //         let pb = ProgressBar::new(100);
-            //         pb.set_style(ProgressStyle::default_bar()
-            //             .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({percent}%)")
-            //             .unwrap());
-            //         catalog.download_model(&model_id, |d, t| {
-            //             pb.set_length(t);
-            //             pb.set_position(d);
-            //         }).await?;
-            //         pb.finish_with_message("Downloaded!");
-            //     }
-            //     ModelAction::Remove { model_id } => {
-            //         catalog.remove_model(&model_id).await?;
-            //         info!("Model removed: {}", model_id);
-            //     }
-            // }
         }
 
         Commands::Config { action } => {
@@ -464,39 +585,18 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Event sink para CLI
-struct CliEventSink {
-    pb: ProgressBar,
-}
-
-#[async_trait::async_trait]
-impl pgl_app::EventSink for CliEventSink {
-    async fn emit(&self, event: pgl_app::AppEvent) {
-        match event {
-            pgl_app::AppEvent::JobProgress { progress, .. } => {
-                self.pb.set_position(progress.completed as u64);
-            }
-            pgl_app::AppEvent::UnitTranslated { .. } => {
-                self.pb.inc(1);
-            }
-            _ => {}
-        }
-    }
-}
-
 /// Translation lookup para CLI
 struct CliTranslationLookup {
     repo: Arc<SqliteRepository>,
-    job_id: uuid::Uuid,
+    job_id: Uuid,
 }
 
-impl pgl_app::TranslationLookup for CliTranslationLookup {
-    fn get(&self, unit_id: &pgl_domain::UnitId) -> Option<pgl_domain::MarkedText> {
-        // Simplificado - em produção buscar do repo
+impl TranslationLookup for CliTranslationLookup {
+    fn get(&self, _unit_id: &UnitId) -> Option<MarkedText> {
         None
     }
 
-    fn get_section(&self, section: &pgl_domain::SectionId) -> Vec<(pgl_domain::UnitId, pgl_domain::MarkedText)> {
+    fn get_section(&self, _section: &SectionId) -> Vec<(UnitId, MarkedText)> {
         Vec::new()
     }
 }
@@ -507,6 +607,5 @@ mod tests {
 
     #[test]
     fn cli_parsing() {
-        // Teste de compilação
     }
 }

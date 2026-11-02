@@ -83,6 +83,7 @@ pub mod prelude {
         TranslationProvider, ModelCatalog, ModelsError, EventSink,
         ImportBook, PlanTranslation, ExecuteJob, ReviewUnit, ExportBook,
     };
+    pub use crate::registry::FormatRegistry;
     pub use pgl_domain::prelude::*;
 }
 
@@ -658,21 +659,20 @@ pub struct TranslationPlan {
 }
 
 /// Executa job de tradução
-pub struct ExecuteJob<P: TranslationProvider, Q: QaChecker, Repo: ProjectRepository, E: EventSink> {
-    provider: Arc<P>,
+pub struct ExecuteJob<Q: QaChecker, Repo: ProjectRepository, E: EventSink> {
+    provider: Arc<dyn TranslationProvider>,
     qa_checker: Arc<Q>,
     repo: Arc<Repo>,
     events: Arc<E>,
 }
 
-impl<P, Q, Repo, E> ExecuteJob<P, Q, Repo, E>
+impl<Q, Repo, E> ExecuteJob<Q, Repo, E>
 where
-    P: TranslationProvider,
     Q: QaChecker,
     Repo: ProjectRepository,
     E: EventSink,
 {
-    pub fn new(provider: Arc<P>, qa_checker: Arc<Q>, repo: Arc<Repo>, events: Arc<E>) -> Self {
+    pub fn new(provider: Arc<dyn TranslationProvider>, qa_checker: Arc<Q>, repo: Arc<Repo>, events: Arc<E>) -> Self {
         Self { provider, qa_checker, repo, events }
     }
 
@@ -802,6 +802,13 @@ where
 /// QA Checker trait (implementado no domínio)
 pub trait QaChecker: Send + Sync {
     fn check(&self, unit: &Unit, lang_pair: &LangPair, glossary: Option<&Glossary>) -> QaResult;
+}
+
+impl QaChecker for pgl_domain::QaChecker {
+    fn check(&self, unit: &Unit, lang_pair: &LangPair, glossary: Option<&Glossary>) -> QaResult {
+        // Delegates to the domain's check method
+        pgl_domain::QaChecker::check(self, unit, lang_pair, glossary)
+    }
 }
 
 /// Revisa unidade manualmente

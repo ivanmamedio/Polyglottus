@@ -12,19 +12,18 @@ path = "src/main.rs"
 [dependencies]
 pgl-app = { workspace = true }
 pgl-domain = { workspace = true }
-# pgl-fmt-text = { workspace = true }
-# pgl-fmt-pdf = { workspace = true }
-# pgl-fmt-epub = { workspace = true }
-# pgl-fmt-ooxml = { workspace = true }
-# pgl-fmt-odf = { workspace = true }
-# pgl-fmt-convert = { workspace = true }
+pgl-fmt-text = { workspace = true }
+pgl-fmt-pdf = { workspace = true }
+pgl-fmt-epub = { workspace = true }
+pgl-fmt-ooxml = { workspace = true }
+pgl-fmt-odf = { workspace = true }
+pgl-fmt-convert = { workspace = true }
 pgl-provider-openai = { workspace = true }
-# pgl-provider-ollama = { workspace = true }
-# pgl-provider-embedded = { workspace = true }
-# pgl-ocr = { workspace = true }
-# pgl-storage = { workspace = true }
+pgl-provider-ollama = { workspace = true }
+pgl-provider-embedded = { workspace = true }
+pgl-ocr = { workspace = true }
+pgl-storage = { workspace = true }
 pgl-secrets = { workspace = true }
-# pgl-testkit = { workspace = true }
 clap = { workspace = true, features = ["derive", "env"] }
 tokio = { workspace = true, features = ["full"] }
 tracing = { workspace = true }
@@ -32,6 +31,7 @@ tracing-subscriber = { workspace = true }
 anyhow = { workspace = true }
 indicatif = { workspace = true }
 uuid = { workspace = true }
+async-trait = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

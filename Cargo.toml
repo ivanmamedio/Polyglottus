@@ -18,7 +18,7 @@ members = [
     "crates/adapters/pgl-storage",
     "crates/adapters/pgl-secrets",
     # "crates/adapters/pgl-models",
-    # "crates/bins/pgl-cli",
+    "crates/bins/pgl-cli",
     # "crates/bins/pgl-engine",
     # "crates/testing/pgl-testkit",
     # "apps/desktop/src-tauri",

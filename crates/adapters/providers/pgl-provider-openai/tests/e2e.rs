@@ -6,7 +6,7 @@ use pgl_app::{
     JobConfig, Unit, UnitKind, MarkedText,
     SourceRef, SectionId, UnitId,
 };
-use pgl_domain::{Project, Job, Glossary, GlossaryEntry, StyleGuide, QaCheck, QaConfig, QaWarningCode, QaSeverity};
+use pgl_domain::{Project, Job, Glossary, GlossaryEntry, StyleGuide, QaChecker as QaCheck, QaConfig, QaWarningCode, QaSeverity};
 use pgl_provider_openai::OpenAICompatProvider;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
