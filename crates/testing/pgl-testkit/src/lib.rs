@@ -4,22 +4,34 @@
 #![warn(missing_docs)]
 #![warn(clippy::all, clippy::pedantic, clippy::nursery, clippy::cargo)]
 
-pub mod fake_provider;
-pub mod fixtures;
-pub mod helpers;
-pub mod contract_tests;
-
-use pgl_app::{TranslationProvider, ProviderError, Capabilities, TranslateRequest, TranslateResponse, ModelInfo, Language, TokenUsage, UnitTranslation, QaWarning};
-use pgl_domain::{Unit, UnitId, MarkedText, LangPair, Glossary, StyleGuide};
+use pgl_app::{
+    TranslationProvider, ProviderError, Capabilities, TranslateRequest, TranslateResponse,
+    ModelInfo, Language, TokenUsage, UnitTranslation, QaWarning,
+    ImportBook, PlanTranslation, ExecuteJob, ExportBook,
+    FormatReader, FormatWriter, ProjectRepository, SecretStore, ModelCatalog,
+    ExportOptions, FormatError, TranslationLookup, QaChecker, EventSink, AppEvent,
+    prelude::FormatRegistry,
+};
+use pgl_domain::{
+    Unit, UnitId, MarkedText, LangPair, Glossary, StyleGuide, UnitKind,
+    Project, JobConfig, SectionId,
+};
 use async_trait::async_trait;
 use std::sync::Arc;
 use std::collections::HashMap;
+use uuid::Uuid;
+use std::path::PathBuf;
+use std::path::Path;
+use pgl_fmt_epub::{EpubReader, EpubWriter};
+use pgl_fmt_text::{TxtReader, TxtWriter};
+use pgl_storage::SqliteRepository;
+use tempfile::TempDir;
 
 /// FakeProvider determinístico para testes
 ///
 /// Inverte o texto ou adiciona prefixo para simular tradução
 /// sem precisar de modelo real, GPU, rede, etc.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct FakeProvider {
     mode: FakeMode,
     delay_ms: u64,
@@ -84,7 +96,7 @@ impl FakeProvider {
                 Ok(unit.text.clone())
             }
             FakeMode::Structured => {
-                Ok(MarkedText::new(format!("[{}] {}", unit.kind, unit.text.raw)))
+                Ok(MarkedText::new(format!("[{:?}] {}", unit.kind, unit.text.raw)))
             }
             FakeMode::PlaceholderError => {
                 // Retorna texto sem placeholders (vai falhar QA)
@@ -187,6 +199,7 @@ pub fn repetition_provider() -> Arc<FakeProvider> {
 pub mod fixtures {
     use super::*;
     use pgl_domain::{Unit, UnitKind, SectionId, SourceRef, Language, MarkedText, UnitId};
+    use uuid::Uuid;
 
     /// Cria unidade de teste simples
     pub fn make_unit(text: &str) -> Unit {
@@ -200,6 +213,7 @@ pub mod fixtures {
             UnitKind::Paragraph,
             MarkedText::new(text),
             SectionId::new(),
+            Uuid::nil(),
         )
     }
 
@@ -216,6 +230,7 @@ pub mod fixtures {
             UnitKind::Paragraph,
             marked,
             SectionId::new(),
+            Uuid::nil(),
         )
     }
 
@@ -264,7 +279,7 @@ pub mod fixtures {
 /// Helpers para testes de integração
 pub mod helpers {
     use super::*;
-    use pgl_app::{ImportBook, PlanTranslation, ExecuteJob, ExportBook, FormatRegistry};
+    use pgl_app::{ImportBook, PlanTranslation, ExecuteJob, ExportBook, prelude::FormatRegistry};
     use pgl_domain::{Language, ExportOptions, OutputFormat, JobConfig};
     use pgl_fmt_epub::{EpubReader, EpubWriter};
     use pgl_fmt_text::{TxtReader, TxtWriter};
@@ -290,13 +305,13 @@ pub mod helpers {
         (temp, repo)
     }
 
-    /// Cria ImportBook para testes
-    pub fn test_import_book(registry: FormatRegistry, repo: Arc<SqliteRepository>) -> ImportBook {
-        ImportBook::new(registry.readers().to_vec(), repo)
+    /// Cria ImportBook para testes com readers específicos
+    pub fn test_import_book(registry: FormatRegistry, repo: Arc<SqliteRepository>) -> ImportBook<EpubReader, SqliteRepository> {
+        ImportBook::new(vec![Arc::new(EpubReader::new())], repo)
     }
 
     /// Cria PlanTranslation para testes
-    pub fn test_planner(catalog: Arc<dyn pgl_app::ModelCatalog>) -> PlanTranslation {
+    pub fn test_planner<M: pgl_app::ModelCatalog + 'static>(catalog: Arc<M>) -> PlanTranslation<M> {
         PlanTranslation::new(catalog)
     }
 
@@ -304,7 +319,7 @@ pub mod helpers {
     pub fn test_executor(
         provider: Arc<dyn pgl_app::TranslationProvider>,
         repo: Arc<SqliteRepository>,
-    ) -> ExecuteJob<_, pgl_domain::QaChecker, _, _> {
+    ) -> ExecuteJob<pgl_domain::QaChecker, SqliteRepository, TestEventSink> {
         ExecuteJob::new(
             provider,
             Arc::new(pgl_domain::QaChecker::new(Default::default())),
@@ -324,16 +339,13 @@ pub mod helpers {
 /// Testes de contrato para adaptadores
 pub mod contract_tests {
     use super::*;
-    use pgl_app::{FormatReader, FormatWriter, SourceDocument, TranslationProvider, OcrEngine, ProjectRepository, SecretStore, ModelCatalog};
+    use pgl_app::{FormatReader, FormatWriter, TranslationProvider, OcrEngine, ProjectRepository, SecretStore, ModelCatalog, ExportOptions, TranslationLookup};
     use pgl_domain::{Unit, UnitKind, SectionId, MarkedText, SourceRef, Language};
 
     /// Testa contrato FormatReader
     pub async fn test_format_reader<R: FormatReader>(reader: &R, test_file: &std::path::Path) {
-        let doc = reader.open(test_file).await.expect("Failed to open");
-        let mut units = Vec::new();
-        while let Some(unit_result) = doc.units().next() {
-            units.push(unit_result.expect("Failed to read unit"));
-        }
+        let mut doc = reader.open(test_file).await.expect("Failed to open");
+        let units: Vec<_> = doc.units().collect::<Result<Vec<_>, _>>().expect("Failed to read units");
         assert!(!units.is_empty(), "Should extract at least one unit");
     }
 
@@ -358,7 +370,7 @@ pub mod contract_tests {
 
         provider.health_check().await.expect("Health check failed");
 
-        let models = provider.list_models().await.expect("List models failed");
+        let _models = provider.list_models().await.expect("List models failed");
         // Pode ser vazio para alguns provedores
     }
 
