@@ -166,6 +166,30 @@ impl FormatId {
     pub const XLIFF: FormatId = FormatId("xliff");
     pub const TMX: FormatId = FormatId("tmx");
     pub const JSON_I18N: FormatId = FormatId("json-i18n");
+
+    /// Converte FormatId para OutputFormat
+    pub fn to_output_format(&self) -> OutputFormat {
+        match self.0 {
+            "epub" => OutputFormat::EPUB,
+            "docx" => OutputFormat::DOCX,
+            "pptx" => OutputFormat::PPTX,
+            "xlsx" => OutputFormat::XLSX,
+            "odt" => OutputFormat::ODT,
+            "odp" => OutputFormat::ODP,
+            "ods" => OutputFormat::ODS,
+            "html" => OutputFormat::HTML,
+            "txt" => OutputFormat::TXT,
+            "md" => OutputFormat::MD,
+            "pdf" => OutputFormat::PDF,
+            "srt" => OutputFormat::SRT,
+            "vtt" => OutputFormat::VTT,
+            "xliff" => OutputFormat::XLIFF,
+            "tmx" => OutputFormat::TMX,
+            "po" => OutputFormat::PO,
+            "json-i18n" => OutputFormat::JSON_I18N,
+            _ => OutputFormat::SameAsSource,
+        }
+    }
 }
 
 /// Confiança na detecção (0-100)

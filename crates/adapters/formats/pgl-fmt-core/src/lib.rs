@@ -8,6 +8,7 @@ pub mod sniff;
 pub mod xml;
 pub mod zip_safe;
 pub mod source_ref;
+pub mod format_builder;
 
 use std::io::Write;
 use std::io::{Read, Seek};
@@ -194,6 +195,23 @@ pub fn sniff_zip_format(path: &Path, expected_files: &[&str]) -> Confidence {
         (false, true) => Confidence::medium(),
         (false, false) => Confidence::none(),
     }
+}
+
+pub use format_builder::{
+    ZipFormatReaderBuilder, ZipFormatReaderConfig, BuiltinZipFormatReader,
+    ZipFormatWriterBuilder, ZipFormatWriterConfig, BuiltinZipFormatWriter,
+};
+
+/// Cria ZIP vazio
+pub fn create_empty_zip() -> Vec<u8> {
+    use zip::ZipWriter;
+    use std::io::Cursor;
+    let mut buf = Vec::new();
+    {
+        let mut zip = ZipWriter::new(Cursor::new(&mut buf));
+        zip.finish().unwrap();
+    }
+    buf
 }
 
 #[cfg(test)]
