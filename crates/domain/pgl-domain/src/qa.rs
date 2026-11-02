@@ -159,13 +159,13 @@ impl QaChecker {
                 warnings.push(QaWarning {
                     code: QaWarningCode::LengthRatio,
                     message: format!("Translation too short: ratio {:.2} (min {:.2})", ratio, self.config.min_length_ratio),
-                    severity: QaSeverity::Warning,
+                    severity: QaSeverity::Error,
                 });
             } else if ratio > self.config.max_length_ratio {
                 warnings.push(QaWarning {
                     code: QaWarningCode::LengthRatio,
                     message: format!("Translation too long: ratio {:.2} (max {:.2})", ratio, self.config.max_length_ratio),
-                    severity: QaSeverity::Warning,
+                    severity: QaSeverity::Error,
                 });
             }
         }
@@ -221,25 +221,22 @@ impl QaChecker {
 
         for entry in glossary.terms_sorted() {
             if entry.do_not_translate {
-                // Verifica se termo "não traduzir" apareceu na tradução
-                if translation.raw.contains(&entry.target_term) && entry.target_term != entry.source_term {
+                // Verifica se termo "não traduzir" apareceu na tradução (não deveria)
+                if translation.raw.contains(&entry.source_term) {
                     warnings.push(QaWarning {
                         code: QaWarningCode::GlossaryViolation,
                         message: format!("Do-not-translate term '{}' was translated", entry.source_term),
                         severity: QaSeverity::Error,
                     });
                 }
-            } else if translation.raw.contains(&entry.source_term) {
-                // Termo do glossário aparece no original mas não na tradução
-                if !translation.raw.contains(&entry.target_term) {
-                    // Verifica se o termo está no texto original
-                    if unit.text.raw.contains(&entry.source_term) {
-                        warnings.push(QaWarning {
-                            code: QaWarningCode::GlossaryViolation,
-                            message: format!("Glossary term '{}' → '{}' not applied", entry.source_term, entry.target_term),
-                            severity: QaSeverity::Warning,
-                        });
-                    }
+            } else {
+                // Termo do glossário deve ser traduzido: se aparece no original, deve aparecer na tradução
+                if unit.text.raw.contains(&entry.source_term) && !translation.raw.contains(&entry.target_term) {
+                    warnings.push(QaWarning {
+                        code: QaWarningCode::GlossaryViolation,
+                        message: format!("Glossary term '{}' → '{}' not applied", entry.source_term, entry.target_term),
+                        severity: QaSeverity::Warning,
+                    });
                 }
             }
         }

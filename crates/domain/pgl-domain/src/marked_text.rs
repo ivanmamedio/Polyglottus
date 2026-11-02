@@ -128,7 +128,6 @@ impl MarkedText {
             if c == '⟦' {
                 // Parse placeholder
                 let mut ph_num = String::new();
-                chars.next(); // consume '⟦'
                 
                 eprintln!("DEBUG: after consuming ⟦, peek={:?}", chars.peek());
                 

@@ -261,7 +261,7 @@ impl RollingSummary {
 
     fn trim(&mut self) {
         let mut total: usize = self.window.iter().map(|s| s.len()).sum();
-        while total > self.max_chars && !self.window.is_empty() {
+        while total > self.max_chars && self.window.len() > 1 {
             if let Some(removed) = self.window.pop_front() {
                 total -= removed.len();
             }
@@ -298,7 +298,11 @@ mod tests {
     fn segmenter_large_unit() {
         let text = "First sentence. Second sentence! Third sentence? Fourth sentence.";
         let unit = make_unit(text);
-        let segmenter = Segmenter::default();
+        // Use max_segment_size pequeno para forçar segmentação
+        let segmenter = Segmenter::new(vec![SegmentationRule {
+            max_segment_size: 20,
+            ..SegmentationRule::default()
+        }]);
         let segments = segmenter.segment_unit(&unit);
 
         assert!(segments.len() >= 2);
@@ -321,9 +325,14 @@ mod tests {
 
     #[test]
     fn recombine() {
-        let unit = make_unit("First. Second. Third.");
+        // Texto longo o suficiente para forçar segmentação (max_segment_size default = 2000)
+        let long_text = "First sentence. ".repeat(150) + "Second sentence. " + &"Third sentence. ".repeat(150);
+        let unit = make_unit(&long_text);
         let segmenter = Segmenter::default();
         let segments = segmenter.segment_unit(&unit);
+
+        // Deve ter segmentos múltiplos devido ao tamanho
+        assert!(segments.len() >= 2, "Expected multiple segments, got {}", segments.len());
 
         // Simula tradução
         let translated: Vec<_> = segments.iter().enumerate().map(|(i, s)| {

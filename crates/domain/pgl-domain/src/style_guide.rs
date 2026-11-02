@@ -51,7 +51,7 @@ impl StyleGuide {
 
         // Ajustes específicos por idioma
         match lang.code() {
-            "pt" | "pt-BR" | "pt-PT" => {
+            "pt" | "pt-br" | "pt-pt" => {
                 guide.formality = FormalityLevel::Neutral;
                 guide.pronouns = PronounRules {
                     use_voseo: false,
@@ -209,7 +209,7 @@ impl TypographyRules {
                 space_before_punctuation: false,
                 title_case: TitleCase::Sentence,
             },
-            "pt" | "pt-BR" | "pt-PT" => Self {
+            "pt" | "pt-br" | "pt-pt" => Self {
                 quotes: "\"\"".into(),
                 use_em_dash: true,
                 space_before_punctuation: false,
@@ -283,7 +283,7 @@ impl PronounRules {
                 informal_pronoun: "tú".into(),
                 avoid_pronouns: false,
             },
-            "pt" | "pt-BR" => Self {
+            "pt" | "pt-br" => Self {
                 use_voseo: false,
                 use_tuteo: true,
                 formal_pronoun: "você".into(),
@@ -356,28 +356,28 @@ fn default_metric() -> bool { true }
 impl LocalizationRules {
     fn default_for(lang: &Language) -> Self {
         match lang.code() {
-            "en-US" => Self {
+            "en-us" => Self {
                 date_format: Some("MM/DD/YYYY".into()),
                 decimal_separator: ".".into(),
                 thousands_separator: ",".into(),
                 default_currency: Some("USD".into()),
                 metric_system: false,
             },
-            "en" | "en-GB" => Self {
+            "en" | "en-gb" => Self {
                 date_format: Some("DD/MM/YYYY".into()),
                 decimal_separator: ".".into(),
                 thousands_separator: ",".into(),
                 default_currency: Some("GBP".into()),
                 metric_system: true,
             },
-            "pt-BR" => Self {
+            "pt-br" => Self {
                 date_format: Some("DD/MM/YYYY".into()),
                 decimal_separator: ",".into(),
                 thousands_separator: ".".into(),
                 default_currency: Some("BRL".into()),
                 metric_system: true,
             },
-            "pt" | "pt-PT" => Self {
+            "pt" | "pt-pt" => Self {
                 date_format: Some("DD/MM/YYYY".into()),
                 decimal_separator: ",".into(),
                 thousands_separator: ".".into(),
@@ -443,7 +443,7 @@ mod tests {
 
     #[test]
     fn style_guide_default_pt() {
-        let guide = StyleGuide::default_for(Language::new("pt-BR"));
+        let guide = StyleGuide::default_for(Language::new("pt-br"));
         assert_eq!(guide.formality, FormalityLevel::Neutral);
         assert_eq!(guide.pronouns.formal_pronoun, "você");
         assert_eq!(guide.pronouns.informal_pronoun, "tu");
@@ -469,12 +469,12 @@ mod tests {
 
     #[test]
     fn style_guide_to_prompt() {
-        let mut guide = StyleGuide::default_for(Language::new("pt-BR"));
+        let mut guide = StyleGuide::default_for(Language::new("pt-br"));
         guide.custom_instructions = "Mantenha o tom literário.".into();
         guide.vocabulary.preferred_terms.insert("you".into(), "você".into());
 
         let prompt = guide.to_system_prompt();
-        assert!(prompt.contains("Portuguese"));
+        assert!(prompt.contains("pt-br"));
         assert!(prompt.contains("neutral"));
         assert!(prompt.contains("Mantenha o tom literário"));
         assert!(prompt.contains("you→você"));
@@ -482,7 +482,7 @@ mod tests {
 
     #[test]
     fn vocabulary_rules() {
-        let mut guide = StyleGuide::default_for(Language::new("pt-BR"));
+        let mut guide = StyleGuide::default_for(Language::new("pt-br"));
         guide.vocabulary.preferred_terms.insert("computer".into(), "computador".into());
         guide.vocabulary.avoided_terms.push("ordenador".into()); // espanhol europeu
 
