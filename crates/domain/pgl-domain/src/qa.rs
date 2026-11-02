@@ -65,6 +65,11 @@ impl Default for QaConfig {
     }
 }
 
+/// Trait para verificadores de QA - permite injetar diferentes implementações
+pub trait QaChecking: Send + Sync {
+    fn check(&self, unit: &Unit, lang_pair: &LangPair, glossary: Option<&super::Glossary>) -> QaResult;
+}
+
 impl QaChecker {
     pub fn new(config: QaConfig) -> Self {
         Self {
@@ -468,5 +473,11 @@ mod tests {
         let result = checker.check(&unit, &super::LangPair { source: Language::new("en"), target: Language::new("pt") }, Some(&glossary));
 
         assert!(result.warnings.iter().any(|w| w.code == QaWarningCode::GlossaryViolation && w.severity == QaSeverity::Error));
+    }
+}
+
+impl QaChecking for QaChecker {
+    fn check(&self, unit: &Unit, lang_pair: &LangPair, glossary: Option<&super::Glossary>) -> QaResult {
+        self.check(unit, lang_pair, glossary)
     }
 }

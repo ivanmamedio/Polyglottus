@@ -697,7 +697,7 @@ async fn acquire_job_lock(_job_id: Uuid) -> parking_lot::MutexGuard<'static, ()>
 }
 
 /// Executa job de tradução
-pub struct ExecuteJob<Q: QaChecker, Repo: ProjectRepository, E: EventSink> {
+pub struct ExecuteJob<Q: pgl_domain::qa::QaChecking, Repo: ProjectRepository, E: EventSink> {
     provider: Arc<dyn TranslationProvider>,
     qa_checker: Arc<Q>,
     repo: Arc<Repo>,
@@ -706,7 +706,7 @@ pub struct ExecuteJob<Q: QaChecker, Repo: ProjectRepository, E: EventSink> {
 
 impl<Q, Repo, E> ExecuteJob<Q, Repo, E>
 where
-    Q: QaChecker,
+    Q: pgl_domain::qa::QaChecking,
     Repo: ProjectRepository,
     E: EventSink,
 {
@@ -840,17 +840,11 @@ where
     }
 }
 
-/// QA Checker trait (implementado no domínio)
-pub trait QaChecker: Send + Sync {
-    fn check(&self, unit: &Unit, lang_pair: &LangPair, glossary: Option<&Glossary>) -> QaResult;
-}
+/// QA Checker trait (definido no domínio)
+pub use pgl_domain::qa::QaChecking as QaCheckerTrait;
 
-impl QaChecker for pgl_domain::QaChecker {
-    fn check(&self, unit: &Unit, lang_pair: &LangPair, glossary: Option<&Glossary>) -> QaResult {
-        // Delegates to the domain's check method
-        pgl_domain::QaChecker::check(self, unit, lang_pair, glossary)
-    }
-}
+/// Alias for backward compatibility
+pub type QaChecker = dyn pgl_domain::qa::QaChecking;
 
 /// Revisa unidade manualmente
 pub struct ReviewUnit<Repo: ProjectRepository> {

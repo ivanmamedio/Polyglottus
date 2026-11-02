@@ -7,7 +7,7 @@
 use async_trait::async_trait;
 use clap::{Parser, Subcommand};
 use indicatif::{ProgressBar, ProgressStyle};
-use pgl_app::{ImportBook, SecretStore, ProjectRepository, TranslationProvider, QaChecker, ExportOptions, OutputFormat, ExportReport, FormatId, TranslateRequest, TranslationLookup, FormatReader, FormatError, SourceDocument};
+use pgl_app::{ImportBook, SecretStore, ProjectRepository, TranslationProvider, ExportOptions, OutputFormat, ExportReport, FormatId, TranslateRequest, TranslationLookup, FormatReader, FormatError, SourceDocument};
 use pgl_app::prelude::FormatRegistry;
 use pgl_domain::{Language, UnitId, SectionId, MarkedText, JobState};
 use pgl_fmt_epub::{EpubReader, EpubWriter};
@@ -72,7 +72,7 @@ impl FormatReader for AnyFormatReader {
 // Simple inline execution without EventSink trait
 async fn execute_translation(
     provider: Arc<dyn TranslationProvider>,
-    qa_checker: Arc<dyn QaChecker>,
+    qa_checker: Arc<dyn pgl_domain::qa::QaChecking>,
     repo: Arc<SqliteRepository>,
     job_id: Uuid,
     pb: &ProgressBar,
@@ -527,7 +527,7 @@ async fn main() -> anyhow::Result<()> {
                 .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({percent}%) ETA: {eta}")
                 .unwrap());
 
-            let qa_checker = Arc::new(pgl_domain::QaChecker::new(Default::default()));
+            let qa_checker: Arc<dyn pgl_domain::qa::QaChecking> = Arc::new(pgl_domain::QaChecker::new(Default::default()));
             execute_translation(translation_provider, qa_checker, repo.clone(), job_id, &pb).await?;
 
             pb.finish_with_message("Translation completed!");
