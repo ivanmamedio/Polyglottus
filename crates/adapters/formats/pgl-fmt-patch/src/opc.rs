@@ -167,8 +167,13 @@ impl OpcPackage {
         let content = self.content_parts.get_mut(file_path)
             .ok_or_else(|| FormatError::WriteError(format!("File not found: {}", file_path)))?;
 
-        // Placeholder - implementação real usaria XML parser
-        Err(FormatError::WriteError("Update node not implemented generically".into()))
+        // Parse XML, encontra o nó e atualiza
+        let xml_str = std::str::from_utf8(content)
+            .map_err(|e| FormatError::WriteError(e.to_string()))?;
+        
+        let updated = update_xml_text_node(xml_str, xpath, text_node_index, new_text)?;
+        *content = updated.into_bytes();
+        Ok(())
     }
 
     /// Salva pacote
@@ -196,6 +201,90 @@ fn extract_attr(line: &str, attr: &str) -> Option<String> {
     let start = line.find(&pattern)? + pattern.len();
     let end = line[start..].find('"')? + start;
     Some(line[start..end].to_string())
+}
+
+/// Atualiza texto de um nó XML específico via XPath simples
+/// Suporta apenas XPaths simples do tipo: //tag ou //ns:tag ou //tag[@attr='value']
+fn update_xml_text_node(xml: &str, xpath: &str, text_node_index: usize, new_text: &str) -> Result<String, FormatError> {
+    use quick_xml::events::{Event, BytesStart, BytesEnd, BytesText};
+    use quick_xml::Reader;
+    use quick_xml::Writer;
+    use std::io::Cursor;
+
+    // Parse do XPath simples
+    let target_tag = parse_simple_xpath(xpath);
+    
+    let mut reader = Reader::from_str(xml);
+    reader.expand_empty_elements(true);
+    
+    let mut writer = Writer::new(Cursor::new(Vec::new()));
+    let mut buf = Vec::new();
+    let mut tag_depth = 0;
+    let mut current_path = Vec::new();
+    let mut text_node_count = 0;
+    let mut found_target = false;
+
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref e)) => {
+                let name = e.name();
+                let name_str = std::str::from_utf8(name.as_ref()).unwrap_or("");
+                
+                current_path.push(name_str.to_string());
+                let path_str = current_path.join("/");
+                
+                // Verifica se este é o alvo
+                if path_str.ends_with(&target_tag) {
+                    if !found_target {
+                        found_target = true;
+                        tag_depth = current_path.len();
+                    }
+                }
+                
+                // Escreve o elemento de abertura
+                let mut start_elem = BytesStart::new(name_str);
+                for attr in e.attributes().flatten() {
+                    start_elem.push_attribute(attr);
+                }
+                writer.write_event(Event::Start(start_elem))?;
+            }
+            Ok(Event::End(ref e)) => {
+                let name = e.name();
+                let name_str = std::str::from_utf8(name.as_ref()).unwrap_or("");
+                current_path.pop();
+                writer.write_event(Event::End(BytesEnd::new(name_str)))?;
+            }
+            Ok(Event::Text(e)) => {
+                let text = e.unescape().unwrap_or_default();
+                
+                // Se estamos no nó alvo e é o índice correto
+                if found_target && current_path.len() == tag_depth && text_node_index == 0 {
+                    writer.write_event(Event::Text(BytesText::new(new_text)))?;
+                    text_node_count += 1;
+                } else {
+                    writer.write_event(Event::Text(BytesText::new(&text)))?;
+                }
+            }
+            Ok(Event::Eof) => break,
+            Err(_) => break,
+            Ok(e) => {
+                writer.write_event(e)?;
+            }
+        }
+        buf.clear();
+    }
+
+    let result = writer.into_inner().into_inner();
+    Ok(String::from_utf8_lossy(&result).to_string())
+}
+
+/// Parse XPath simples para extrair tag alvo
+/// Exemplos: //w:t -> "w:t", //p -> "p", //w:p/w:r/w:t -> "w:t"
+fn parse_simple_xpath(xpath: &str) -> String {
+    // Remove prefixos // e divide por /
+    let parts: Vec<&str> = xpath.trim_start_matches('/').split('/').collect();
+    // Retorna a última parte (tag mais específica)
+    parts.last().unwrap_or(&xpath).to_string()
 }
 
 #[cfg(test)]

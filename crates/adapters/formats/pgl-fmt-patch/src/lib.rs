@@ -162,6 +162,109 @@ impl Default for ScannerRegistry {
     }
 }
 
+/// Escaneia conteúdo XML genérico no package
+fn scan_xml_content(package: &OpcPackage, text_selector: &str, _context_selector: &str) -> Result<Vec<UnitLocation>, FormatError> {
+    let mut locations = Vec::new();
+    let mut global_idx = 0;
+
+    // Para cada parte de conteúdo XML
+    for (file_path, content) in package.content_parts() {
+        // Pula arquivos não-XML
+        if !file_path.ends_with(".xml") && !file_path.ends_with(".xhtml") {
+            continue;
+        }
+
+        // Parse XML e extrai nós de texto
+        let xml_str = std::str::from_utf8(content)
+            .map_err(|e| FormatError::ParseError(e.to_string()))?;
+
+        // Extrai nós de texto usando quick-xml
+        let text_nodes = extract_text_nodes(xml_str, text_selector)?;
+        
+        for (node_idx, (xpath, original_text, kind)) in text_nodes.into_iter().enumerate() {
+            if original_text.trim().is_empty() {
+                continue;
+            }
+
+            let source_ref = pgl_fmt_core::make_source_ref(&file_path, &xpath);
+            let unit_id = pgl_fmt_core::make_unit_id(&source_ref, &original_text);
+            let section = pgl_fmt_core::make_section_id();
+            
+            locations.push(UnitLocation {
+                unit_id,
+                file_path: file_path.clone(),
+                xpath: format!("{}", xpath),
+                text_node_index: node_idx,
+                original_text,
+                kind,
+                section,
+            });
+            global_idx += 1;
+        }
+    }
+
+    Ok(locations)
+}
+
+/// Extrai nós de texto do XML baseado no seletor
+fn extract_text_nodes(xml: &str, selector: &str) -> Result<Vec<(String, String, pgl_domain::UnitKind)>, FormatError> {
+    use quick_xml::events::Event;
+    use quick_xml::Reader;
+    use std::collections::HashSet;
+
+    let selectors: HashSet<&str> = selector.split(',').map(|s| s.trim()).collect();
+    let mut reader = Reader::from_str(xml);
+    reader.expand_empty_elements(true);
+    
+    let mut results = Vec::new();
+    let mut buf = Vec::new();
+    let mut current_path = Vec::new();
+    let mut text_content = String::new();
+    let mut collecting_text = false;
+
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref e)) => {
+                let name = e.name();
+                let name_str = std::str::from_utf8(name.as_ref()).unwrap_or("");
+                current_path.push(name_str.to_string());
+                let path_str = current_path.join("/");
+                
+                // Verifica se este elemento corresponde ao seletor
+                if selectors.contains(name_str) {
+                    collecting_text = true;
+                    text_content.clear();
+                }
+            }
+            Ok(Event::End(ref e)) => {
+                let name = e.name();
+                let name_str = std::str::from_utf8(name.as_ref()).unwrap_or("");
+                current_path.pop();
+                
+                if collecting_text && selectors.contains(name_str) {
+                    let xpath = current_path.join("/");
+                    if !text_content.trim().is_empty() {
+                        results.push((xpath, text_content.trim().to_string(), pgl_domain::UnitKind::Paragraph));
+                    }
+                    collecting_text = false;
+                }
+            }
+            Ok(Event::Text(e)) => {
+                if collecting_text {
+                    let text = e.unescape().unwrap_or_default();
+                    text_content.push_str(&text);
+                }
+            }
+            Ok(Event::Eof) => break,
+            Err(_) => break,
+            _ => {}
+        }
+        buf.clear();
+    }
+
+    Ok(results)
+}
+
 /// Leitor genérico usando PatchEngine
 pub struct PatchFormatReader {
     scanner: Arc<dyn FormatScanner>,
@@ -886,12 +989,12 @@ impl FormatWriter for HtmlWriter {
     }
 }
 
-/// Scanner ODF genérico (placeholder)
+/// Scanner ODF genérico
 pub struct OdfScanner;
 
 impl FormatScanner for OdfScanner {
-    fn scan(&self, _package: &OpcPackage) -> Result<Vec<UnitLocation>, FormatError> {
-        Err(FormatError::ParseError("ODF scanner not implemented".into()))
+    fn scan(&self, package: &OpcPackage) -> Result<Vec<UnitLocation>, FormatError> {
+        scan_xml_content(package, "text:p", "text:p|text:h|text:span|text:a")
     }
 
     fn get_text_selector(&self) -> &'static str {
@@ -907,8 +1010,8 @@ impl FormatScanner for OdfScanner {
 pub struct DocxScanner;
 
 impl FormatScanner for DocxScanner {
-    fn scan(&self, _package: &OpcPackage) -> Result<Vec<UnitLocation>, FormatError> {
-        Err(FormatError::ParseError("DOCX scanner not implemented".into()))
+    fn scan(&self, package: &OpcPackage) -> Result<Vec<UnitLocation>, FormatError> {
+        scan_xml_content(package, "w:t", "w:p|w:tbl|w:drawing")
     }
 
     fn get_text_selector(&self) -> &'static str {
@@ -924,8 +1027,8 @@ impl FormatScanner for DocxScanner {
 pub struct PptxScanner;
 
 impl FormatScanner for PptxScanner {
-    fn scan(&self, _package: &OpcPackage) -> Result<Vec<UnitLocation>, FormatError> {
-        Err(FormatError::ParseError("PPTX scanner not implemented".into()))
+    fn scan(&self, package: &OpcPackage) -> Result<Vec<UnitLocation>, FormatError> {
+        scan_xml_content(package, "a:t", "p:sp|p:txBody")
     }
 
     fn get_text_selector(&self) -> &'static str {
@@ -941,8 +1044,8 @@ impl FormatScanner for PptxScanner {
 pub struct XlsxScanner;
 
 impl FormatScanner for XlsxScanner {
-    fn scan(&self, _package: &OpcPackage) -> Result<Vec<UnitLocation>, FormatError> {
-        Err(FormatError::ParseError("XLSX scanner not implemented".into()))
+    fn scan(&self, package: &OpcPackage) -> Result<Vec<UnitLocation>, FormatError> {
+        scan_xml_content(package, "si > t", "sheetData > row > c")
     }
 
     fn get_text_selector(&self) -> &'static str {
@@ -958,8 +1061,8 @@ impl FormatScanner for XlsxScanner {
 pub struct EpubScanner;
 
 impl FormatScanner for EpubScanner {
-    fn scan(&self, _package: &OpcPackage) -> Result<Vec<UnitLocation>, FormatError> {
-        Err(FormatError::ParseError("EPUB scanner not implemented".into()))
+    fn scan(&self, package: &OpcPackage) -> Result<Vec<UnitLocation>, FormatError> {
+        scan_xml_content(package, "p|h1|h2|h3|h4|h5|h6|li|td|th|caption|figcaption", "h1|h2|h3|h4|h5|h6|li|td|figcaption")
     }
 
     fn get_text_selector(&self) -> &'static str {
@@ -975,8 +1078,8 @@ impl FormatScanner for EpubScanner {
 pub struct HtmlScanner;
 
 impl FormatScanner for HtmlScanner {
-    fn scan(&self, _package: &OpcPackage) -> Result<Vec<UnitLocation>, FormatError> {
-        Err(FormatError::ParseError("HTML scanner not implemented".into()))
+    fn scan(&self, package: &OpcPackage) -> Result<Vec<UnitLocation>, FormatError> {
+        scan_xml_content(package, "p|h1|h2|h3|h4|h5|h6|li|td|th|caption|figcaption", "h1|h2|h3|h4|h5|h6|li|td|figcaption|article|section")
     }
 
     fn get_text_selector(&self) -> &'static str {
