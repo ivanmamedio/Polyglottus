@@ -21,6 +21,7 @@ pub mod unit;
 
 use std::fmt;
 use std::hash::{Hash, Hasher};
+use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use blake3;
@@ -254,6 +255,8 @@ impl FidelityReport {
 pub struct ExportOptions {
     /// Formato de saída desejado
     pub output_format: OutputFormat,
+    /// Caminho do arquivo de saída (None = auto-generate based on source)
+    pub output_path: Option<PathBuf>,
     /// Gerar versão bilíngue (original + tradução)
     pub bilingual: bool,
     /// Idioma da interface para metadados
@@ -268,6 +271,7 @@ impl Default for ExportOptions {
     fn default() -> Self {
         Self {
             output_format: OutputFormat::SameAsSource,
+            output_path: None,
             bilingual: false,
             ui_language: Language::new("pt-BR"),
             preserve_formatting: true,
@@ -299,6 +303,32 @@ pub enum OutputFormat {
     TMX,
     PO,
     JSON_I18N,
+}
+
+impl OutputFormat {
+    /// Retorna a extensão padrão para este formato
+    pub fn default_extension(&self) -> &'static str {
+        match self {
+            OutputFormat::SameAsSource => "", // Will use source extension
+            OutputFormat::EPUB => "epub",
+            OutputFormat::DOCX => "docx",
+            OutputFormat::PPTX => "pptx",
+            OutputFormat::XLSX => "xlsx",
+            OutputFormat::ODT => "odt",
+            OutputFormat::ODP => "odp",
+            OutputFormat::ODS => "ods",
+            OutputFormat::HTML => "html",
+            OutputFormat::TXT => "txt",
+            OutputFormat::MD => "md",
+            OutputFormat::PDF => "pdf",
+            OutputFormat::SRT => "srt",
+            OutputFormat::VTT => "vtt",
+            OutputFormat::XLIFF => "xliff",
+            OutputFormat::TMX => "tmx",
+            OutputFormat::PO => "po",
+            OutputFormat::JSON_I18N => "json",
+        }
+    }
 }
 
 /// Relatório de exportação

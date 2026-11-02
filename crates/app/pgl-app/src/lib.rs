@@ -900,6 +900,10 @@ impl<W: FormatWriter, Repo: ProjectRepository> ExportBook<W, Repo> {
         let job = self.repo.load_job(&job_id).await?
             .ok_or(AppError::JobNotFound(job_id))?;
 
+        // Find the project that contains this job to get the source file
+        let project = self.repo.find_project_for_job(&job_id).await?
+            .ok_or_else(|| AppError::Validation("Project not found for job".into()))?;
+
         // Extract format ID before borrowing job
         let source_format_id = job.config.lang_pair.source.0.clone();
 
@@ -911,8 +915,17 @@ impl<W: FormatWriter, Repo: ProjectRepository> ExportBook<W, Repo> {
         // Constrói lookup de traduções
         let lookup = JobTranslationLookup { job: &job };
 
+        // Determina caminho de saída
+        let source_path = project.source_file.clone();
+        let output_path = options.output_path.clone().unwrap_or_else(|| {
+            // Gera nome de saída baseado no arquivo original
+            let mut output = project.source_file.clone();
+            output.set_extension(options.output_format.default_extension());
+            output
+        });
+
         // Exporta
-        let report = writer.write(&std::path::Path::new(""), &lookup, &options, &std::path::Path::new("")).await?;
+        let report = writer.write(&source_path, &lookup, &options, &output_path).await?;
 
         Ok(report)
     }
