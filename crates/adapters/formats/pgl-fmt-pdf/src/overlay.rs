@@ -1,17 +1,32 @@
 //! PDF Overlay - Mantém PDF original, sobrepõe texto traduzido
+use uuid::Uuid;
 
-use pgl_app::{FormatError, ExportOptions, ExportReport, TranslationLookup, OutputFormat};
+use pgl_app::{FormatError, ExportOptions, ExportReport, OutputFormat};
 use std::path::Path;
+use crate::reflow::create_empty_zip;
+use lopdf::{Document as LoppdfDocument, Object, ObjectId, Stream};
+use zip::ZipWriter;
+use std::io::Cursor;
+use tokio::fs;
 
 /// Escreve PDF com overlay de tradução
 pub async fn write_pdf_overlay(
     source: &Path,
-    translations: &dyn TranslationLookup,
-    options: &ExportOptions,
+    _translations: &dyn TranslationLookup,
+    _options: &ExportOptions,
     out: &Path,
 ) -> Result<ExportReport, FormatError> {
-    // Copy source to out for now (placeholder implementation)
-    tokio::fs::copy(source, out).await?;
+    // Lê PDF original
+    let source_bytes = fs::read(source).await
+        .map_err(|e| FormatError::WriteError(format!("Failed to read source: {}", e)))?;
+    
+    let doc = LoppdfDocument::load_mem(&source_bytes)
+        .map_err(|e| FormatError::ParseError(e.to_string()))?;
+
+    // Cria novo PDF com as mesmas páginas mas adicionando anotações de tradução
+    // Por enquanto, apenas copia o PDF original
+    fs::write(out, source_bytes).await
+        .map_err(|e| FormatError::WriteError(format!("Failed to write output: {}", e)))?;
 
     Ok(ExportReport {
         output_path: out.display().to_string(),
@@ -22,7 +37,7 @@ pub async fn write_pdf_overlay(
         output_size: std::fs::metadata(out)?.len(),
         export_time_ms: 0,
         warnings: vec![
-            "Overlay mode: placeholder implementation".into(),
+            "Overlay mode: basic implementation (translation overlay not yet implemented)".into(),
         ],
     })
 }
@@ -38,27 +53,25 @@ pub async fn write_pdf_bilingual(
 }
 
 /// Gera UnitId para PDF baseado em texto + posição
-pub fn make_unit_id_for_pdf(text: &str, page: usize, bbox: (f32, f32, f32, f32)) -> pgl_domain::UnitId {
+pub fn pdf_unit_id(page: u32, index: usize) -> UnitId {
     use std::hash::{Hash, Hasher};
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    text.hash(&mut hasher);
     page.hash(&mut hasher);
-    bbox.0.to_bits().hash(&mut hasher);
-    bbox.1.to_bits().hash(&mut hasher);
-    pgl_domain::UnitId::from_hash(hasher.finish())
+    index.hash(&mut hasher);
+    UnitId::from_hash(hasher.finish())
 }
+
+use pgl_domain::{UnitId, Unit};
+use pgl_app::TranslationLookup;
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn make_unit_id_for_pdf_test() {
-        let id1 = make_unit_id_for_pdf("Hello", 1, (0.0, 0.0, 100.0, 20.0));
-        let id2 = make_unit_id_for_pdf("Hello", 1, (0.0, 0.0, 100.0, 20.0));
+    fn pdf_unit_id_deterministic() {
+        let id1 = pdf_unit_id(1, 0);
+        let id2 = pdf_unit_id(1, 0);
         assert_eq!(id1, id2);
-
-        let id3 = make_unit_id_for_pdf("World", 1, (0.0, 0.0, 100.0, 20.0));
-        assert_ne!(id1, id3);
     }
 }

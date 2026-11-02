@@ -6,17 +6,7 @@ use pgl_app::{SourceDocument, AssetRef, FidelityReport, DocumentMetadata, Format
 use pgl_fmt_core::{ZipSourceDocument, default_zip_fidelity};
 use std::path::Path;
 use zip::ZipArchive;
-
-fn create_empty_zip() -> Vec<u8> {
-    use zip::ZipWriter;
-    use std::io::Cursor;
-    let mut buf = Vec::new();
-    {
-        let mut zip = ZipWriter::new(Cursor::new(&mut buf));
-        zip.finish().unwrap();
-    }
-    buf
-}
+use crate::reflow::create_empty_zip;
 
 /// Abre PDF com OCR (renderiza páginas como imagens e roda OCR)
 pub async fn open_pdf_ocr(path: &Path) -> Result<Box<dyn SourceDocument>, FormatError> {
@@ -38,19 +28,17 @@ pub async fn open_pdf_ocr(path: &Path) -> Result<Box<dyn SourceDocument>, Format
     unit.id = unit_id;
     unit.metadata.insert("page".into(), serde_json::Value::Number(1.into()));
     unit.metadata.insert("needs_ocr".into(), serde_json::Value::Bool(true));
-
     units.push(unit);
 
+    let fidelity = default_zip_fidelity()
+        .with_preserved("Imagens das páginas")
+        .with_not_preserved("Texto (precisa OCR)")
+        .with_warning("Requer OCR engine para extrair texto");
+
     let metadata = DocumentMetadata {
-        title: Some("Scanned PDF".to_string()),
-        page_count: Some(1),
+        title: Some("PDF (OCR needed)".to_string()),
         ..Default::default()
     };
-
-    let fidelity = default_zip_fidelity()
-        .with_preserved("Estrutura de páginas")
-        .with_not_preserved("Texto (requer OCR)")
-        .with_warning("PDF escaneado: requer OCR para extrair texto. Use pgl-ocr adapter.");
 
     let empty_archive = ZipArchive::new(std::io::Cursor::new(create_empty_zip())).unwrap();
 
@@ -64,7 +52,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn pdf_ocr_placeholder() {
+    fn ocr_placeholder() {
         // Teste de compilação apenas
     }
 }
