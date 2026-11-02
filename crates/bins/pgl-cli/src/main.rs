@@ -357,7 +357,7 @@ async fn main() -> anyhow::Result<()> {
     // Inicializa componentes
     let db_path = data_dir.join("polyglottus.db");
     let repo = Arc::new(SqliteRepository::new(&db_path).await?);
-    let secrets = Arc::new(SystemSecretStore::new("polyglottus"));
+    let secrets = Arc::new(SystemSecretStore::new("polyglottus").await?);
 
     // Registry de formatos
     let mut fmt_registry = FormatRegistry::new();

@@ -7,21 +7,79 @@
 use pgl_app::{SecretStore, SecretsError};
 use async_trait::async_trait;
 use keyring::Entry;
+use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
+use std::io;
+use std::path::{Path, PathBuf};
+use tokio::fs;
+use tokio::sync::Mutex;
 use tracing::{debug, warn};
 
 /// Armazenamento de segredos usando keyring do sistema
 pub struct SystemSecretStore {
     service: String,
+    index_path: PathBuf,
+    index: Mutex<HashSet<String>>,
 }
 
 impl SystemSecretStore {
-    pub fn new(service: impl Into<String>) -> Self {
-        Self { service: service.into() }
+    pub async fn new(service: impl Into<String>) -> Result<Self, SecretsError> {
+        let service = service.into();
+        let index_path = dirs::data_dir()
+            .unwrap_or_else(|| PathBuf::from("."))
+            .join("polyglottus")
+            .join("secrets")
+            .join(format!("{}.index.json", service.replace('/', "_")));
+
+        // Carrega índice existente ou cria novo
+        let index = if index_path.exists() {
+            let content = fs::read_to_string(&index_path)
+                .await
+                .map_err(|e| SecretsError::Backend(e.to_string()))?;
+            serde_json::from_str(&content).ok().unwrap_or_default()
+        } else {
+            HashSet::new()
+        };
+
+        Ok(Self {
+            service,
+            index_path,
+            index: Mutex::new(index),
+        })
     }
 
     fn entry(&self, key: &str) -> Result<Entry, SecretsError> {
         Entry::new(&self.service, key)
             .map_err(|e| SecretsError::Backend(e.to_string()))
+    }
+
+    /// Adiciona chave ao índice
+    async fn add_to_index(&self, key: &str) -> Result<(), SecretsError> {
+        let mut index = self.index.lock().await;
+        index.insert(key.to_string());
+        // Release lock before saving
+        std::mem::drop(index);
+        self.save_index().await
+    }
+
+    /// Remove chave do índice
+    async fn remove_from_index(&self, key: &str) -> Result<(), SecretsError> {
+        {
+            let mut index = self.index.lock().await;
+            index.remove(key);
+        }
+        self.save_index().await
+    }
+
+    /// Salva índice em arquivo
+    async fn save_index(&self) -> Result<(), SecretsError> {
+        let index = self.index.lock().await;
+        if let Some(parent) = self.index_path.parent() {
+            fs::create_dir_all(parent).await.map_err(|e| SecretsError::Backend(e.to_string()))?;
+        }
+        let json = serde_json::to_string(&*index).map_err(|e| SecretsError::Backend(e.to_string()))?;
+        fs::write(&self.index_path, json).await.map_err(|e| SecretsError::Backend(e.to_string()))?;
+        Ok(())
     }
 }
 
@@ -41,6 +99,7 @@ impl SecretStore for SystemSecretStore {
         entry.set_password(value)
             .map_err(|e| SecretsError::Backend(e.to_string()))?;
         debug!("Secret stored: {}", key);
+        self.add_to_index(key).await?;
         Ok(())
     }
 
@@ -49,6 +108,7 @@ impl SecretStore for SystemSecretStore {
         match entry.delete_credential() {
             Ok(_) => {
                 debug!("Secret deleted: {}", key);
+                self.remove_from_index(key).await?;
                 Ok(())
             }
             Err(keyring::Error::NoEntry) => Ok(()), // Já não existe
@@ -57,10 +117,10 @@ impl SecretStore for SystemSecretStore {
     }
 
     async fn list(&self) -> Result<Vec<String>, SecretsError> {
-        // keyring não suporta listagem nativamente
-        // Em implementação real, manter índice separado
-        warn!("Listing secrets not supported by keyring backend");
-        Ok(Vec::new())
+        let index = self.index.lock().await;
+        let mut keys: Vec<String> = index.iter().cloned().collect();
+        keys.sort();
+        Ok(keys)
     }
 }
 

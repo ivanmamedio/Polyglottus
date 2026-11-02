@@ -161,7 +161,7 @@ impl AppState {
     async fn new(data_dir: PathBuf) -> anyhow::Result<Self> {
         let db_path = data_dir.join("polyglottus.db");
         let repo = Arc::new(SqliteRepository::new(&db_path).await?);
-        let secrets = Arc::new(SystemSecretStore::new("polyglottus"));
+        let secrets = Arc::new(SystemSecretStore::new("polyglottus").await?);
 
         let mut catalog = ModelCatalogImpl::new(pgl_models::CatalogConfig {
             models_dir: data_dir.join("models"),
