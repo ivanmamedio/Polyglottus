@@ -8,6 +8,8 @@ pub mod odt;
 pub mod odp;
 pub mod ods;
 
+use uuid::Uuid;
+
 use std::path::Path;
 use async_trait::async_trait;
 use pgl_app::{FormatReader, FormatWriter, FormatId, Confidence, FormatError, ExportOptions, ExportReport, TranslationLookup, SourceDocument, AssetRef, DocumentMetadata, OutputFormat};

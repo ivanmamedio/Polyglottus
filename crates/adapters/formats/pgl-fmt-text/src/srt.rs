@@ -1,5 +1,6 @@
 //! SRT - SubRip Subtitle format
 
+use uuid::Uuid;
 use pgl_domain::{Unit, UnitId, UnitKind, SectionId, MarkedText, SourceRef};
 use pgl_app::{SourceDocument, AssetRef, FidelityReport, DocumentMetadata, FormatError, ExportOptions, ExportReport, TranslationLookup, OutputFormat};
 use pgl_fmt_core::{ZipSourceDocument, default_zip_fidelity};
@@ -73,7 +74,7 @@ pub async fn open_srt(path: &Path) -> Result<SourceDoc, FormatError> {
             length: Some(entry.text.len()),
         };
 
-        let mut unit = Unit::new(source_ref, UnitKind::Subtitle, MarkedText::new(&entry.text), section);
+        let mut unit = Unit::new(source_ref, UnitKind::Subtitle, MarkedText::new(&entry.text), section, Uuid::nil());
         unit.id = unit_id;
         // Armazena timing como metadata
         unit.metadata.insert("start_time".into(), serde_json::Value::String(entry.start));

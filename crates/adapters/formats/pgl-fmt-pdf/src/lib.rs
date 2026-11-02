@@ -11,6 +11,7 @@ pub mod ocr_pdf;
 use std::path::Path;
 use std::sync::Arc;
 use async_trait::async_trait;
+use uuid::Uuid;
 use pgl_app::{FormatReader, FormatWriter, FormatId, Confidence, FormatError, ExportOptions, ExportReport, TranslationLookup, OutputFormat, SourceDocument};
 use pgl_fmt_core::sniff_zip_format;
 

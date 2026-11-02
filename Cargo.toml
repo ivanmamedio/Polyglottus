@@ -15,9 +15,9 @@ members = [
     "crates/adapters/providers/pgl-provider-ollama",
     "crates/adapters/providers/pgl-provider-embedded",
     "crates/adapters/pgl-ocr",
-    # "crates/adapters/pgl-storage",
+    "crates/adapters/pgl-storage",
     "crates/adapters/pgl-secrets",
-    "crates/adapters/pgl-models",
+    # "crates/adapters/pgl-models",
     # "crates/bins/pgl-cli",
     # "crates/bins/pgl-engine",
     # "crates/testing/pgl-testkit",
@@ -51,9 +51,9 @@ pgl-provider-openai = { path = "crates/adapters/providers/pgl-provider-openai" }
 pgl-provider-ollama = { path = "crates/adapters/providers/pgl-provider-ollama" }
 pgl-provider-embedded = { path = "crates/adapters/providers/pgl-provider-embedded" }
 pgl-ocr = { path = "crates/adapters/pgl-ocr" }
-# pgl-storage = { path = "crates/adapters/pgl-storage" }
+pgl-storage = { path = "crates/adapters/pgl-storage" }
 pgl-secrets = { path = "crates/adapters/pgl-secrets" }
-pgl-models = { path = "crates/adapters/pgl-models" }
+# pgl-models = { path = "crates/adapters/pgl-models" }
 pgl-cli = { path = "crates/bins/pgl-cli" }
 # pgl-engine = { path = "crates/bins/pgl-engine" }
 # pgl-testkit = { path = "crates/testing/pgl-testkit" }

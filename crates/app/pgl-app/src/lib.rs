@@ -357,7 +357,7 @@ pub trait ProjectRepository: Send + Sync + 'static {
     async fn load_job(&self, id: &Uuid) -> Result<Option<Job>, StorageError>;
     async fn list_jobs(&self, project_id: &Uuid) -> Result<Vec<JobSummary>, StorageError>;
 
-    async fn save_unit(&self, unit: &Unit) -> Result<(), StorageError>;
+    async fn save_unit(&self, unit: &Unit, job_id: &Uuid) -> Result<(), StorageError>;
     async fn load_unit(&self, id: &UnitId) -> Result<Option<Unit>, StorageError>;
     async fn load_units(&self, job_id: &Uuid, states: &[UnitState]) -> Result<Vec<Unit>, StorageError>;
     async fn update_unit_state(&self, id: &UnitId, state: UnitState) -> Result<(), StorageError>;
@@ -732,6 +732,7 @@ where
             let glossary = job.config.glossary.clone();
             let enable_qa = job.config.enable_qa;
 
+            let job_id = job.id;
             for trans in response.translations {
                 if let Some(unit) = job.unit_mut(&trans.unit_id) {
                     unit.apply_translation(trans.translated_text)?;
@@ -748,7 +749,7 @@ where
                         }
                     }
 
-                    self.repo.save_unit(unit).await?;
+                    self.repo.save_unit(unit, &job_id).await?;
                     self.events.emit(AppEvent::UnitTranslated { job_id, unit_id: trans.unit_id }).await;
                 }
             }
@@ -817,7 +818,8 @@ impl<Repo: ProjectRepository> ReviewUnit<Repo> {
         let mut unit = self.repo.load_unit(&unit_id).await?
             .ok_or(AppError::Validation("Unit not found".into()))?;
         unit.mark_reviewed();
-        self.repo.save_unit(&unit).await?;
+        let job_id = unit.job_id;
+        self.repo.save_unit(&unit, &job_id).await?;
         Ok(())
     }
 
@@ -826,7 +828,8 @@ impl<Repo: ProjectRepository> ReviewUnit<Repo> {
             .ok_or(AppError::Validation("Unit not found".into()))?;
         unit.apply_translation(new_translation)?;
         unit.mark_reviewed();
-        self.repo.save_unit(&unit).await?;
+        let job_id = unit.job_id;
+        self.repo.save_unit(&unit, &job_id).await?;
         Ok(())
     }
 
@@ -834,7 +837,8 @@ impl<Repo: ProjectRepository> ReviewUnit<Repo> {
         let mut unit = self.repo.load_unit(&unit_id).await?
             .ok_or(AppError::Validation("Unit not found".into()))?;
         unit.reset();
-        self.repo.save_unit(&unit).await?;
+        let job_id = unit.job_id;
+        self.repo.save_unit(&unit, &job_id).await?;
         Ok(())
     }
 }

@@ -1,4 +1,5 @@
 //! PDF Reflow - Extrai texto e estrutura para exportar como EPUB/DOCX/HTML
+use uuid::Uuid;
 
 use pgl_domain::{Unit, UnitId, UnitKind, SectionId, MarkedText, SourceRef};
 use pgl_app::{SourceDocument, AssetRef, FidelityReport, DocumentMetadata, FormatError, ExportOptions, ExportReport, TranslationLookup, OutputFormat};
@@ -41,7 +42,7 @@ pub async fn open_pdf_reflow(path: &Path) -> Result<Box<dyn SourceDocument>, For
             length: Some(para.len()),
         };
 
-        let mut unit = Unit::new(source_ref, UnitKind::Paragraph, MarkedText::new(para), section);
+        let mut unit = Unit::new(source_ref, UnitKind::Paragraph, MarkedText::new(para), section, Uuid::nil());
         unit.id = unit_id;
         unit.metadata.insert("page".into(), serde_json::Value::Number(1.into()));
         unit.metadata.insert("global_index".into(), serde_json::Value::Number(global_idx.into()));

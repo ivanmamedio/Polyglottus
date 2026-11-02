@@ -4,6 +4,7 @@ use pgl_app::{TranslationProvider, TranslateRequest, TranslateResponse, FormatEr
 use pgl_provider_openai::OpenAICompatProvider;
 use pgl_domain::{Unit, UnitKind, MarkedText, SourceRef, SectionId, UnitId, LangPair, Language};
 use std::sync::Arc;
+use uuid::Uuid;
 
 /// Teste de integração do provider OpenAI (mock/local)
 /// Nota: Este teste usa o modo local server. Para testar com OpenAI real,
@@ -52,7 +53,7 @@ async fn test_translate_request_structure() {
         },
         UnitKind::Paragraph,
         MarkedText::new("Hello world"),
-        SectionId::new(),
+        SectionId::new(), Uuid::nil(),
     );
     
     let req = TranslateRequest {
@@ -153,7 +154,7 @@ async fn test_real_openai_translation() {
         },
         UnitKind::Paragraph,
         MarkedText::new("Hello, how are you?"),
-        SectionId::new(),
+        SectionId::new(), Uuid::nil(),
     );
     
     let req = TranslateRequest {
@@ -201,7 +202,7 @@ async fn test_provider_error_handling() {
         },
         UnitKind::Paragraph,
         MarkedText::new("Test"),
-        SectionId::new(),
+        SectionId::new(), Uuid::nil(),
     );
     
     let req = TranslateRequest {

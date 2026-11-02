@@ -14,6 +14,8 @@
 #![warn(missing_docs)]
 #![warn(clippy::all, clippy::pedantic, clippy::nursery, clippy::cargo)]
 
+use uuid::Uuid;
+
 pub mod opc;
 
 use std::path::Path;
@@ -118,7 +120,7 @@ impl PatchEngine {
                 source_ref,
                 loc.kind,
                 MarkedText::new(&loc.original_text),
-                loc.section,
+                loc.section, Uuid::nil(),
             );
             unit.id = loc.unit_id;
             unit
@@ -201,7 +203,7 @@ impl FormatReader for PatchFormatReader {
                 source_ref,
                 loc.kind,
                 MarkedText::new(&loc.original_text),
-                loc.section,
+                loc.section, Uuid::nil(),
             );
             unit.id = loc.unit_id;
             unit

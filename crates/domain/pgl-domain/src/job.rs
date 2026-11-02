@@ -47,7 +47,8 @@ impl Job {
 
     /// Adiciona unidades ao job
     pub fn add_units(&mut self, units: Vec<Unit>) {
-        for unit in units {
+        for mut unit in units {
+            unit.job_id = self.id;
             self.sections.push(unit.section);
             self.units.insert(unit.id, unit);
         }
@@ -316,7 +317,7 @@ mod tests {
             offset: None,
             length: None,
         };
-        Unit::new(source_ref, UnitKind::Paragraph, MarkedText::new(text), SectionId::new())
+        Unit::new(source_ref, UnitKind::Paragraph, MarkedText::new(text), SectionId::new(), Uuid::nil())
     }
 
     #[test]

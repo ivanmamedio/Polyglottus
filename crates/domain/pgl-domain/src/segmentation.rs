@@ -3,6 +3,7 @@
 use super::{MarkedText, Unit, UnitId, UnitKind, SectionId, SourceRef, unit};
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
+use uuid::Uuid;
 
 /// Regras de segmentação
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -278,7 +279,8 @@ mod tests {
             SourceRef { internal_path: "test".into(), selector: "1".into(), offset: None, length: None },
             UnitKind::Paragraph,
             MarkedText::new(text),
-            SectionId::new()
+            SectionId::new(),
+            Uuid::nil()
         )
     }
 

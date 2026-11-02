@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id, source_ref, kind, text, section, state, translation, qa_warnings, retry_count, metadata FROM units WHERE id = ?",
+  "query": "SELECT id, project_id, job_id, name, lang_pair_source, lang_pair_target, entries, metadata, created_at, updated_at FROM glossaries WHERE project_id = ?",
   "describe": {
     "columns": [
       {
@@ -9,49 +9,49 @@
         "type_info": "Text"
       },
       {
-        "name": "source_ref",
+        "name": "project_id",
         "ordinal": 1,
         "type_info": "Text"
       },
       {
-        "name": "kind",
+        "name": "job_id",
         "ordinal": 2,
         "type_info": "Text"
       },
       {
-        "name": "text",
+        "name": "name",
         "ordinal": 3,
         "type_info": "Text"
       },
       {
-        "name": "section",
+        "name": "lang_pair_source",
         "ordinal": 4,
         "type_info": "Text"
       },
       {
-        "name": "state",
+        "name": "lang_pair_target",
         "ordinal": 5,
         "type_info": "Text"
       },
       {
-        "name": "translation",
+        "name": "entries",
         "ordinal": 6,
         "type_info": "Text"
       },
       {
-        "name": "qa_warnings",
+        "name": "metadata",
         "ordinal": 7,
         "type_info": "Text"
       },
       {
-        "name": "retry_count",
+        "name": "created_at",
         "ordinal": 8,
         "type_info": "Integer"
       },
       {
-        "name": "metadata",
+        "name": "updated_at",
         "ordinal": 9,
-        "type_info": "Text"
+        "type_info": "Integer"
       }
     ],
     "parameters": {
@@ -59,16 +59,16 @@
     },
     "nullable": [
       true,
-      false,
-      false,
-      false,
-      false,
-      false,
       true,
+      true,
+      false,
+      false,
+      false,
+      false,
       false,
       false,
       false
     ]
   },
-  "hash": "cb02015076e222993dd753b7480f90f4da385a1a4345002b5403e045267be30b"
+  "hash": "0847dcaf6c3cc8d2b036e1492992d11a171fdc4416fd68fbc85048a8fd48e8fd"
 }

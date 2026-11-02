@@ -1,5 +1,6 @@
 //! XLIFF - XML Localization Interchange File Format
 
+use uuid::Uuid;
 use pgl_domain::{Unit, UnitId, UnitKind, SectionId, MarkedText, SourceRef};
 use pgl_app::{SourceDocument, AssetRef, FidelityReport, DocumentMetadata, FormatError, ExportOptions, ExportReport, TranslationLookup, OutputFormat};
 use pgl_fmt_core::{ZipSourceDocument, default_zip_fidelity};
@@ -128,7 +129,7 @@ pub async fn open_xliff(path: &Path) -> Result<SourceDoc, FormatError> {
             length: Some(entry.source.len()),
         };
 
-        let mut unit = Unit::new(source_ref, UnitKind::Paragraph, MarkedText::new(&entry.source), section);
+        let mut unit = Unit::new(source_ref, UnitKind::Paragraph, MarkedText::new(&entry.source), section, Uuid::nil());
         unit.id = unit_id;
         if let Some(target) = &entry.target {
             unit.metadata.insert("target".into(), serde_json::Value::String(target.clone()));

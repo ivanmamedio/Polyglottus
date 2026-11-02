@@ -11,6 +11,7 @@ use pgl_domain::{Unit, UnitId, UnitKind, SectionId, MarkedText, Language};
 use pgl_fmt_core::{ZipFormatReader, ZipFormatWriter, ZipSourceDocument, make_source_ref, default_zip_fidelity, sniff_zip_format};
 use epub::doc::EpubDoc;
 use zip::ZipArchive;
+use uuid::Uuid;
 
 /// Leitor EPUB (usa epub crate para parsing robusto)
 pub struct EpubReader;
@@ -80,7 +81,7 @@ impl FormatReader for EpubReader {
             for (para_idx, para) in paragraphs.iter().copied().enumerate() {
                 let unit_id = UnitId::new();
                 let source_ref = make_source_ref(&manifest_item.path.to_string_lossy(), &format!("paragraph[{}]", para_idx));
-                let mut unit = Unit::new(source_ref, UnitKind::Paragraph, MarkedText::new(para), section);
+                let mut unit = Unit::new(source_ref, UnitKind::Paragraph, MarkedText::new(para), section, Uuid::nil());
                 unit.id = unit_id;
                 unit.metadata.insert("spine_index".into(), serde_json::Value::Number(spine_idx.into()));
                 unit.metadata.insert("resource_id".into(), serde_json::Value::String(idref.clone()));

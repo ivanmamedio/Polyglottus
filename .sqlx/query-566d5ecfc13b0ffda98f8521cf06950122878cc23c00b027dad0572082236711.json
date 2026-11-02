@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO glossaries (id, project_id, job_id, name, lang_pair_source, lang_pair_target, entries, metadata, created_at, updated_at)\n            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 10
+    },
+    "nullable": []
+  },
+  "hash": "566d5ecfc13b0ffda98f8521cf06950122878cc23c00b027dad0572082236711"
+}

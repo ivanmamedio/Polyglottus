@@ -1,4 +1,5 @@
 //! PDF OCR - Para PDFs escaneados (imagens)
+use uuid::Uuid;
 
 use pgl_domain::{Unit, UnitId, UnitKind, SectionId, MarkedText, SourceRef};
 use pgl_app::{SourceDocument, AssetRef, FidelityReport, DocumentMetadata, FormatError};
@@ -33,7 +34,7 @@ pub async fn open_pdf_ocr(path: &Path) -> Result<Box<dyn SourceDocument>, Format
         length: None,
     };
 
-    let mut unit = Unit::new(source_ref, UnitKind::Paragraph, MarkedText::new("[OCR needed]"), section);
+    let mut unit = Unit::new(source_ref, UnitKind::Paragraph, MarkedText::new("[OCR needed]"), section, Uuid::nil());
     unit.id = unit_id;
     unit.metadata.insert("page".into(), serde_json::Value::Number(1.into()));
     unit.metadata.insert("needs_ocr".into(), serde_json::Value::Bool(true));

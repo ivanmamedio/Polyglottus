@@ -1,5 +1,6 @@
 //! Markdown
 
+use uuid::Uuid;
 use pgl_domain::{Unit, UnitId, UnitKind, SectionId, MarkedText, SourceRef, MarkError};
 use pgl_app::{SourceDocument, AssetRef, FidelityReport, DocumentMetadata, FormatError, ExportOptions, ExportReport, TranslationLookup, OutputFormat};
 use pgl_fmt_core::{ZipSourceDocument, default_zip_fidelity};
@@ -96,7 +97,7 @@ pub async fn open_md(path: &Path) -> Result<SourceDoc, FormatError> {
                         offset: None,
                         length: Some(text.len()),
                     };
-                    let mut unit = Unit::new(source_ref, UnitKind::Paragraph, MarkedText::new(&text), section);
+                    let mut unit = Unit::new(source_ref, UnitKind::Paragraph, MarkedText::new(&text), section, Uuid::nil());
                     unit.id = unit_id;
                     units.push(unit);
                     *idx += 1;
@@ -112,7 +113,7 @@ pub async fn open_md(path: &Path) -> Result<SourceDoc, FormatError> {
                         offset: None,
                         length: Some(text.len()),
                     };
-                    let mut unit = Unit::new(source_ref, UnitKind::Heading(heading.level as u8), MarkedText::new(&text), section);
+                    let mut unit = Unit::new(source_ref, UnitKind::Heading(heading.level as u8), MarkedText::new(&text), section, Uuid::nil());
                     unit.id = unit_id;
                     units.push(unit);
                     *idx += 1;
@@ -128,7 +129,7 @@ pub async fn open_md(path: &Path) -> Result<SourceDoc, FormatError> {
                         offset: None,
                         length: Some(text.len()),
                     };
-                    let mut unit = Unit::new(source_ref, UnitKind::CodeBlock, MarkedText::new(&text), section);
+                    let mut unit = Unit::new(source_ref, UnitKind::CodeBlock, MarkedText::new(&text), section, Uuid::nil());
                     unit.id = unit_id;
                     units.push(unit);
                     *idx += 1;
@@ -144,7 +145,7 @@ pub async fn open_md(path: &Path) -> Result<SourceDoc, FormatError> {
                         offset: None,
                         length: Some(text.len()),
                     };
-                    let mut unit = Unit::new(source_ref, UnitKind::ListItem, MarkedText::new(&text), section);
+                    let mut unit = Unit::new(source_ref, UnitKind::ListItem, MarkedText::new(&text), section, Uuid::nil());
                     unit.id = unit_id;
                     units.push(unit);
                     *idx += 1;

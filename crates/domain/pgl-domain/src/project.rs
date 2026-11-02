@@ -153,8 +153,8 @@ mod tests {
         if let Some(job) = project.job_mut(&job_id) {
             use crate::{Unit, UnitKind, MarkedText, SourceRef, SectionId};
             let units = vec![
-                Unit::new(SourceRef { internal_path: "test.txt".into(), selector: "1".into(), offset: None, length: None }, UnitKind::Paragraph, MarkedText::new("One"), SectionId::new()),
-                Unit::new(SourceRef { internal_path: "test.txt".into(), selector: "2".into(), offset: None, length: None }, UnitKind::Paragraph, MarkedText::new("Two"), SectionId::new()),
+                Unit::new(SourceRef { internal_path: "test.txt".into(), selector: "1".into(), offset: None, length: None }, UnitKind::Paragraph, MarkedText::new("One"), SectionId::new(), Uuid::nil()),
+                Unit::new(SourceRef { internal_path: "test.txt".into(), selector: "2".into(), offset: None, length: None }, UnitKind::Paragraph, MarkedText::new("Two"), SectionId::new(), Uuid::nil()),
             ];
             job.add_units(units);
         }

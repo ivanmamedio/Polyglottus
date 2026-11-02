@@ -23,6 +23,7 @@ tokio = { workspace = true, features = ["fs", "macros"] }
 regex = { workspace = true }
 md5 = { workspace = true }
 async-trait = { workspace = true }
+uuid = { workspace = true }
 
 [dev-dependencies]
 insta = { workspace = true }

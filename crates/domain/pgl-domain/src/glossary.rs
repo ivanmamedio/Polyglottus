@@ -3,6 +3,8 @@
 use super::Language;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::time::SystemTime;
+use uuid::Uuid;
 
 /// Glossário de termos
 ///
@@ -10,24 +12,53 @@ use std::collections::HashMap;
 /// no idioma de destino, com metadados de contexto.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Glossary {
+    /// ID único do glossário
+    #[serde(default = "Uuid::now_v7")]
+    pub id: Uuid,
+    /// ID do projeto associado (opcional)
+    pub project_id: Option<Uuid>,
+    /// ID do job associado (opcional)
+    pub job_id: Option<Uuid>,
+    /// Nome do glossário
+    pub name: String,
     /// Par de idiomas deste glossário
     pub lang_pair: super::LangPair,
     /// Entradas do glossário
     #[serde(default)]
     pub entries: HashMap<String, GlossaryEntry>,
-    /// Metadados
+    /// Metadados adicionais
     #[serde(default)]
     pub metadata: GlossaryMetadata,
+    /// Data de criação
+    #[serde(default = "SystemTime::now")]
+    pub created_at: SystemTime,
+    /// Data de última atualização
+    #[serde(default = "SystemTime::now")]
+    pub updated_at: SystemTime,
 }
 
 impl Glossary {
     /// Cria glossário vazio
     pub fn new(source: Language, target: Language) -> Self {
+        let now = SystemTime::now();
         Self {
+            id: Uuid::now_v7(),
+            project_id: None,
+            job_id: None,
+            name: "Untitled Glossary".into(),
             lang_pair: super::LangPair { source, target },
             entries: HashMap::new(),
             metadata: GlossaryMetadata::default(),
+            created_at: now,
+            updated_at: now,
         }
+    }
+
+    /// Cria glossário com nome
+    pub fn with_name(name: impl Into<String>, source: Language, target: Language) -> Self {
+        let mut glossary = Self::new(source, target);
+        glossary.name = name.into();
+        glossary
     }
 
     /// Adiciona uma entrada

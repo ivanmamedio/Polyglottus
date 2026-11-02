@@ -1,5 +1,6 @@
 //! PO - Gettext Portable Object format
 
+use uuid::Uuid;
 use pgl_domain::{Unit, UnitId, UnitKind, SectionId, MarkedText, SourceRef};
 use pgl_app::{SourceDocument, AssetRef, FidelityReport, DocumentMetadata, FormatError, ExportOptions, ExportReport, TranslationLookup, OutputFormat};
 use pgl_fmt_core::{ZipSourceDocument, default_zip_fidelity};
@@ -133,7 +134,7 @@ pub async fn open_po(path: &Path) -> Result<SourceDoc, FormatError> {
             length: Some(entry.msgid.len()),
         };
 
-        let mut unit = Unit::new(source_ref, UnitKind::Paragraph, MarkedText::new(&entry.msgid), section);
+        let mut unit = Unit::new(source_ref, UnitKind::Paragraph, MarkedText::new(&entry.msgid), section, Uuid::nil());
         unit.id = unit_id;
         unit.metadata.insert("msgstr".into(), serde_json::Value::String(entry.msgstr.clone()));
         if let Some(ctx) = &entry.context {

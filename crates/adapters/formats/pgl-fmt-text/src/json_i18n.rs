@@ -1,5 +1,6 @@
 //! JSON i18n - Formatos de localização baseados em JSON
 
+use uuid::Uuid;
 use pgl_domain::{Unit, UnitId, UnitKind, SectionId, MarkedText, SourceRef};
 use pgl_app::{SourceDocument, AssetRef, FidelityReport, DocumentMetadata, FormatError, ExportOptions, ExportReport, TranslationLookup, OutputFormat};
 use pgl_fmt_core::{ZipSourceDocument, default_zip_fidelity};
@@ -109,7 +110,7 @@ pub async fn open_json_i18n(path: &Path) -> Result<SourceDoc, FormatError> {
             length: Some(value.len()),
         };
 
-        let mut unit = Unit::new(source_ref, UnitKind::Paragraph, MarkedText::new(value), section);
+        let mut unit = Unit::new(source_ref, UnitKind::Paragraph, MarkedText::new(value), section, Uuid::nil());
         unit.id = unit_id;
         unit.metadata.insert("json_key".into(), serde_json::Value::String(key.clone()));
         unit.metadata.insert("format".into(), serde_json::Value::String(format!("{:?}", format)));

@@ -1,5 +1,6 @@
 //! HTML - Texto (para arquivos HTML standalone)
 
+use uuid::Uuid;
 use pgl_domain::{Unit, UnitId, UnitKind, SectionId, MarkedText, SourceRef};
 use pgl_app::{SourceDocument, AssetRef, FidelityReport, DocumentMetadata, FormatError, ExportOptions, ExportReport, TranslationLookup, OutputFormat};
 use pgl_fmt_core::{ZipSourceDocument, default_zip_fidelity};
@@ -57,7 +58,7 @@ pub async fn open_html(path: &Path) -> Result<SourceDoc, FormatError> {
                         offset: None,
                         length: Some(text.len()),
                     };
-                    let mut unit = Unit::new(source_ref, kind, MarkedText::new(&text), section);
+                    let mut unit = Unit::new(source_ref, kind, MarkedText::new(&text), section, Uuid::nil());
                     unit.id = unit_id;
                     units.push(unit);
                     *idx += 1;

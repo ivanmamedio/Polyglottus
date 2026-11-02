@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id, name, source_file, source_format, created_at, updated_at FROM projects ORDER BY updated_at DESC",
+  "query": "SELECT id, name, source_format, detected_language, created_at, updated_at FROM projects ORDER BY updated_at DESC",
   "describe": {
     "columns": [
       {
@@ -14,12 +14,12 @@
         "type_info": "Text"
       },
       {
-        "name": "source_file",
+        "name": "source_format",
         "ordinal": 2,
         "type_info": "Text"
       },
       {
-        "name": "source_format",
+        "name": "detected_language",
         "ordinal": 3,
         "type_info": "Text"
       },
@@ -41,10 +41,10 @@
       true,
       false,
       false,
-      false,
+      true,
       false,
       false
     ]
   },
-  "hash": "73ac5e0af2dc5fa50d12ddf27e6454f40ce212da8b2059910224da4842b2c196"
+  "hash": "d7cd4c058ee369960ec9b4f507ae3e88f52d9e126b95644e6caf070aa0c1b504"
 }

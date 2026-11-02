@@ -13,7 +13,7 @@ use std::sync::Arc;
 use std::collections::HashMap;
 use tempfile::TempDir;
 use tokio::fs;
-use uuid;
+use uuid::Uuid;
 
 /// Helper para criar arquivo TXT temporário
 async fn create_temp_txt(content: &str) -> (TempDir, PathBuf) {
@@ -117,6 +117,7 @@ async fn test_qa_validation() {
         UnitKind::Paragraph,
         MarkedText::from_html("Press <b>⟦1⟧OK⟦/1⟧</b> to continue").unwrap(),
         SectionId::new(),
+        Uuid::nil(),
     );
     
     let translated = MarkedText::from_html("Pressione <b>⟦1⟧OK⟦/1⟧</b> para continuar").unwrap();

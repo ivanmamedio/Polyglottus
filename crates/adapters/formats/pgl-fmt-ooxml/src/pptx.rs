@@ -1,4 +1,5 @@
 //! Scanner e writer para PPTX
+use uuid::Uuid;
 
 use crate::create_empty_zip;
 use pgl_domain::{Unit, UnitId, UnitKind, SectionId, MarkedText, SourceRef};
@@ -22,7 +23,7 @@ pub async fn open_pptx(path: &Path) -> Result<Box<dyn SourceDocument>, FormatErr
         length: None,
     };
 
-    let mut unit = Unit::new(source_ref, UnitKind::Paragraph, MarkedText::new("[PPTX placeholder]"), SectionId::new());
+    let mut unit = Unit::new(source_ref, UnitKind::Paragraph, MarkedText::new("[PPTX placeholder]"), SectionId::new(), Uuid::nil());
     unit.id = UnitId::new();
     units.push(unit);
 

@@ -2,6 +2,7 @@
 
 use super::{LangPair, MarkedText, SectionId, SourceRef, UnitId, UnitKind, UnitState};
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 /// Unidade de tradução
 ///
@@ -11,6 +12,8 @@ use serde::{Deserialize, Serialize};
 pub struct Unit {
     /// ID estável (hash do source_ref + texto original)
     pub id: UnitId,
+    /// ID do job ao qual esta unidade pertence
+    pub job_id: Uuid,
     /// Referência ao nó original no documento
     pub source_ref: SourceRef,
     /// Tipo de unidade (parágrafo, título, célula, etc.)
@@ -42,6 +45,7 @@ impl Unit {
         kind: UnitKind,
         text: MarkedText,
         section: SectionId,
+        job_id: Uuid,
     ) -> Self {
         // ID determinístico baseado no conteúdo
         use std::hash::{Hash, Hasher};
@@ -53,6 +57,7 @@ impl Unit {
 
         Self {
             id,
+            job_id,
             source_ref,
             kind,
             text,
@@ -166,7 +171,7 @@ mod tests {
             length: None,
         };
         let marked = MarkedText::new(text);
-        Unit::new(source_ref, UnitKind::Paragraph, marked, SectionId::new())
+        Unit::new(source_ref, UnitKind::Paragraph, marked, SectionId::new(), Uuid::nil())
     }
 
     #[test]
