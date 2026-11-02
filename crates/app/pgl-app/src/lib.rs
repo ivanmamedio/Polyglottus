@@ -12,10 +12,12 @@ pub mod events;
 
 use std::path::Path;
 use std::sync::Arc;
+use std::collections::HashMap;
 use pgl_domain::prelude::*;
 use pgl_domain::unit::PlaceholderError;
 use uuid::Uuid;
 use serde::{Serialize, Deserialize};
+use parking_lot::Mutex;
 
 /// Erros da camada de aplicação
 #[derive(Debug, thiserror::Error)]
@@ -658,6 +660,15 @@ pub struct TranslationPlan {
     pub warnings: Vec<String>,
 }
 
+// Job locking para evitar race conditions
+// Job locking para evitar race conditions (lock global serializa todos os jobs)
+static JOB_LOCK: parking_lot::Mutex<()> = parking_lot::Mutex::new(());
+
+/// Adquire lock global para jobs (serializa todos os jobs, mas evita race conditions)
+async fn acquire_job_lock(_job_id: Uuid) -> parking_lot::MutexGuard<'static, ()> {
+    JOB_LOCK.lock()
+}
+
 /// Executa job de tradução
 pub struct ExecuteJob<Q: QaChecker, Repo: ProjectRepository, E: EventSink> {
     provider: Arc<dyn TranslationProvider>,
@@ -677,6 +688,9 @@ where
     }
 
     pub async fn execute(&self, job_id: Uuid) -> Result<(), AppError> {
+        // Adquire lock exclusivo para este job
+        let _job_lock = acquire_job_lock(job_id).await;
+        
         let mut job = self.repo.load_job(&job_id).await?
             .ok_or(AppError::JobNotFound(job_id))?;
 

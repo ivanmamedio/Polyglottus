@@ -21,6 +21,9 @@ rusqlite = { workspace = true }
 sqlx = { workspace = true }
 zip = { workspace = true }
 quick-xml = { workspace = true }
+lazy_static = "1.4"
+parking_lot = "0.12"
+dashmap = "5.5"
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util"] }
