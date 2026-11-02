@@ -384,6 +384,9 @@ pub trait ProjectRepository: Send + Sync + 'static {
     async fn load_job(&self, id: &Uuid) -> Result<Option<Job>, StorageError>;
     async fn list_jobs(&self, project_id: &Uuid) -> Result<Vec<JobSummary>, StorageError>;
 
+    /// Encontra o projeto que contém um job
+    async fn find_project_for_job(&self, job_id: &Uuid) -> Result<Option<Project>, StorageError>;
+
     async fn save_unit(&self, unit: &Unit, job_id: &Uuid) -> Result<(), StorageError>;
     async fn load_unit(&self, id: &UnitId) -> Result<Option<Unit>, StorageError>;
     async fn load_units(&self, job_id: &Uuid, states: &[UnitState]) -> Result<Vec<Unit>, StorageError>;

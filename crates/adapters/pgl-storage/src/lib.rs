@@ -7,7 +7,7 @@
 use pgl_app::{ProjectRepository, StorageError, Project, Job, Unit, UnitId, UnitState, ProjectSummary, JobSummary, Glossary, ExportOptions};
 use pgl_domain::{Language, SectionId, LangPair};
 use async_trait::async_trait;
-use sqlx::{SqlitePool};
+use sqlx::{SqlitePool, Row};
 use std::sync::Arc;
 use std::path::{Path, PathBuf};
 use uuid::Uuid;
@@ -559,4 +559,52 @@ impl ProjectRepository for SqliteRepository {
     async fn update_unit_translation(&self, id: &UnitId, translation: &pgl_domain::MarkedText, warnings: &[pgl_domain::QaWarning]) -> Result<(), StorageError> {
         self.update_unit_translation(id, translation, warnings).await
     }
+
+    async fn find_project_for_job(&self, job_id: &Uuid) -> Result<Option<Project>, StorageError> {
+        let row = sqlx::query(
+            "SELECT p.id, p.name, p.source_file, p.source_format, p.detected_language, 
+                    p.fidelity_report, p.global_glossary, p.global_style_guide, 
+                    p.export_options, p.created_at, p.updated_at, p.metadata
+             FROM projects p
+             JOIN jobs j ON j.project_id = p.id
+             WHERE j.id = ?"
+        )
+        .bind(job_id.to_string())
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| StorageError::Sqlx(e.into()))?;
+
+        if let Some(row) = row {
+            let fidelity_report: Option<String> = row.get("fidelity_report");
+            let global_glossary: Option<String> = row.get("global_glossary");
+            let global_style_guide: Option<String> = row.get("global_style_guide");
+            let export_options: Option<String> = row.get("export_options");
+            let metadata: Option<String> = row.get("metadata");
+
+            let fidelity_report = fidelity_report.as_deref().and_then(|s| serde_json::from_str(s).ok());
+            let global_glossary = global_glossary.as_deref().and_then(|s| serde_json::from_str(s).ok());
+            let global_style_guide = global_style_guide.as_deref().and_then(|s| serde_json::from_str(s).ok());
+            let export_options: ExportOptions = export_options.as_deref().and_then(|s| serde_json::from_str(s).ok()).unwrap_or_default();
+            let metadata = metadata.as_deref().and_then(|s| serde_json::from_str(s).ok()).unwrap_or_default();
+
+            Ok(Some(Project {
+                id: Uuid::from_slice(&row.get::<Vec<u8>, _>("id")).map_err(|e| StorageError::Serialization(e.to_string()))?,
+                name: row.get("name"),
+                source_file: PathBuf::from(row.get::<String, _>("source_file")),
+                source_format: row.get("source_format"),
+                detected_language: row.get::<Option<String>, _>("detected_language").map(Language),
+                fidelity_report,
+                jobs: HashMap::new(),
+                global_glossary,
+                global_style_guide,
+                export_options,
+                created_at: Self::i64_to_system_time(row.get::<i64, _>("created_at")),
+                updated_at: Self::i64_to_system_time(row.get::<i64, _>("updated_at")),
+                metadata,
+            }))
+        } else {
+            Ok(None)
+        }
+    }
+
 }
