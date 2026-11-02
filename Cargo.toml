@@ -20,7 +20,7 @@ members = [
     # "crates/adapters/pgl-models",
     "crates/bins/pgl-cli",
     # "crates/bins/pgl-engine",
-    # "crates/testing/pgl-testkit",
+    "crates/testing/pgl-testkit",
     # "apps/desktop/src-tauri",
 ]
 
@@ -56,7 +56,7 @@ pgl-secrets = { path = "crates/adapters/pgl-secrets" }
 # pgl-models = { path = "crates/adapters/pgl-models" }
 pgl-cli = { path = "crates/bins/pgl-cli" }
 # pgl-engine = { path = "crates/bins/pgl-engine" }
-# pgl-testkit = { path = "crates/testing/pgl-testkit" }
+pgl-testkit = { path = "crates/testing/pgl-testkit" }
 polyglottus-desktop = { path = "apps/desktop/src-tauri" }
 
 # Config

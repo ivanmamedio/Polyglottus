@@ -135,6 +135,9 @@ pub enum PlaceholderError {
     #[error("Placeholder order mismatch at position {position}: expected {expected}, found {found}")]
     OrderMismatch { position: usize, expected: String, found: String },
 
+    #[error("Placeholder tag mismatch for {placeholder}: expected {expected_tag}, found {found_tag}")]
+    TagMismatch { placeholder: String, expected_tag: String, found_tag: String },
+
     #[error("Placeholder nesting violation: {0}")]
     NestingViolation(String),
 
@@ -150,6 +153,9 @@ impl From<super::marked_text::PlaceholderValidationError> for PlaceholderError {
             }
             super::marked_text::PlaceholderValidationError::OrderMismatch { position, expected, found } => {
                 PlaceholderError::OrderMismatch { position, expected, found }
+            }
+            super::marked_text::PlaceholderValidationError::TagMismatch { placeholder, expected_tag, found_tag } => {
+                PlaceholderError::TagMismatch { placeholder, expected_tag, found_tag }
             }
             super::marked_text::PlaceholderValidationError::NestingViolation(msg) => {
                 PlaceholderError::NestingViolation(msg)

@@ -164,15 +164,19 @@ impl MarkedText {
 
     /// Valida se todos os placeholders originais estão presentes na tradução
     pub fn validate_placeholders_restored(&self, translated: &MarkedText) -> Result<(), PlaceholderValidationError> {
-        let original_ph: Vec<_> = self.placeholders.keys()
+        let mut original_ph: Vec<_> = self.placeholders.keys()
             .filter(|k| !k.starts_with('/'))
             .cloned()
             .collect();
 
-        let translated_ph: Vec<_> = translated.placeholders.keys()
+        let mut translated_ph: Vec<_> = translated.placeholders.keys()
             .filter(|k| !k.starts_with('/'))
             .cloned()
             .collect();
+
+        // Sort numerically for deterministic comparison
+        original_ph.sort_by_key(|k| k.parse::<usize>().unwrap_or(0));
+        translated_ph.sort_by_key(|k| k.parse::<usize>().unwrap_or(0));
 
         // Verifica contagem
         if original_ph.len() != translated_ph.len() {
@@ -182,7 +186,7 @@ impl MarkedText {
             });
         }
 
-        // Verifica ordem e existência
+        // Verifica se as chaves existem e os tags correspondem
         for (i, (orig, trans)) in original_ph.iter().zip(translated_ph.iter()).enumerate() {
             if orig != trans {
                 return Err(PlaceholderValidationError::OrderMismatch {
@@ -191,23 +195,49 @@ impl MarkedText {
                     found: format!("⟦{}⟧", trans),
                 });
             }
+            // Verifica se o tag (valor) corresponde
+            let orig_tag = self.placeholders.get(orig);
+            let trans_tag = translated.placeholders.get(trans);
+            if orig_tag != trans_tag {
+                return Err(PlaceholderValidationError::TagMismatch {
+                    placeholder: format!("⟦{}⟧", orig),
+                    expected_tag: orig_tag.cloned().unwrap_or_default(),
+                    found_tag: trans_tag.cloned().unwrap_or_default(),
+                });
+            }
         }
 
         // Verifica aninhamento (placeholders de fechamento na ordem inversa)
-        let original_close: Vec<_> = self.placeholders.keys()
+        let mut original_close: Vec<_> = self.placeholders.keys()
             .filter(|k| k.starts_with('/'))
             .cloned()
             .collect();
 
-        let translated_close: Vec<_> = translated.placeholders.keys()
+        let mut translated_close: Vec<_> = translated.placeholders.keys()
             .filter(|k| k.starts_with('/'))
             .cloned()
             .collect();
+
+        original_close.sort_by_key(|k| k[1..].parse::<usize>().unwrap_or(0));
+        translated_close.sort_by_key(|k| k[1..].parse::<usize>().unwrap_or(0));
 
         if original_close != translated_close {
             return Err(PlaceholderValidationError::NestingViolation(
                 "Closing placeholders order mismatch".into()
             ));
+        }
+
+        // Verifica tags de fechamento
+        for (orig, trans) in original_close.iter().zip(translated_close.iter()) {
+            let orig_tag = self.placeholders.get(orig);
+            let trans_tag = translated.placeholders.get(trans);
+            if orig_tag != trans_tag {
+                return Err(PlaceholderValidationError::TagMismatch {
+                    placeholder: format!("⟦{}⟧", orig),
+                    expected_tag: orig_tag.cloned().unwrap_or_default(),
+                    found_tag: trans_tag.cloned().unwrap_or_default(),
+                });
+            }
         }
 
         Ok(())
@@ -262,6 +292,9 @@ pub enum PlaceholderValidationError {
 
     #[error("Placeholder order mismatch at position {position}: expected {expected}, found {found}")]
     OrderMismatch { position: usize, expected: String, found: String },
+
+    #[error("Placeholder tag mismatch for {placeholder}: expected {expected_tag}, found {found_tag}")]
+    TagMismatch { placeholder: String, expected_tag: String, found_tag: String },
 
     #[error("Placeholder nesting violation: {0}")]
     NestingViolation(String),
@@ -346,12 +379,22 @@ mod tests {
     #[test]
     fn placeholder_validation_order_mismatch() {
         let original = MarkedText::from_html("<b>Primeiro</b> <i>Segundo</i>").unwrap();
-        let mut translated = MarkedText::from_html("<i>Second</i> <b>First</b>").unwrap();
-        // Ordem trocada
-        translated.raw = "⟦2⟧Second⟦/2⟧ ⟦1⟧First⟦/1⟧".to_string();
+        // Create translated with WRONG tags for placeholder numbers:
+        // Placeholder 1 should be <b> but translated has <i>
+        // Placeholder 2 should be <i> but translated has <b>
+        let mut placeholders = HashMap::new();
+        placeholders.insert("1".to_string(), "<i>".to_string());  // Wrong! Should be <b>
+        placeholders.insert("/1".to_string(), "</i>".to_string());
+        placeholders.insert("2".to_string(), "<b>".to_string());  // Wrong! Should be <i>
+        placeholders.insert("/2".to_string(), "</b>".to_string());
+        let translated = MarkedText {
+            raw: "⟦1⟧First⟦/1⟧ ⟦2⟧Second⟦/2⟧".to_string(),
+            placeholders,
+            original: None,
+        };
 
         let err = original.validate_placeholders_restored(&translated).unwrap_err();
-        assert!(matches!(err, PlaceholderValidationError::OrderMismatch { .. }));
+        assert!(matches!(err, PlaceholderValidationError::TagMismatch { .. }));
     }
 
     #[test]
