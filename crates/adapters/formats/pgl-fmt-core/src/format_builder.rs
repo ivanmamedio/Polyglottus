@@ -112,8 +112,8 @@ impl FormatReader for BuiltinZipFormatReader {
         self.config.extensions
     }
 
-    fn sniff(&self, name: &str, _head: &[u8]) -> Confidence {
-        sniff_zip_format(Path::new(name), self.config.sniff_files)
+    fn sniff(&self, name: &str, head: &[u8]) -> Confidence {
+        sniff_zip_format(Path::new(name), head, self.config.sniff_files)
     }
 
     async fn open(&self, path: &Path) -> Result<Box<dyn SourceDocument + 'static>, FormatError> {

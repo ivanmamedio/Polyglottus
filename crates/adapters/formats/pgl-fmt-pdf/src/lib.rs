@@ -35,7 +35,7 @@ impl FormatReader for PdfReflowReader {
     }
 
     fn sniff(&self, name: &str, head: &[u8]) -> Confidence {
-        sniff_zip_format(Path::new(name), &[".pdf"])
+        sniff_zip_format(Path::new(name), head, &[".pdf"])
     }
 
     async fn open(&self, path: &Path) -> Result<Box<dyn SourceDocument + 'static>, FormatError> {
@@ -101,7 +101,7 @@ impl FormatReader for PdfOcrReader {
 
     fn sniff(&self, name: &str, head: &[u8]) -> Confidence {
         // Mesmo sniff, mas o pipeline decide usar OCR se não houver texto extraível
-        sniff_zip_format(Path::new(name), &[".pdf"])
+        sniff_zip_format(Path::new(name), head, &[".pdf"])
     }
 
     async fn open(&self, path: &Path) -> Result<Box<dyn SourceDocument + 'static>, FormatError> {

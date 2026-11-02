@@ -125,7 +125,7 @@ impl ConverterType {
         }
     }
 
-    pub fn sniff(&self, name: &str) -> Confidence {
+    pub fn sniff(&self, name: &str, _head: &[u8]) -> Confidence {
         match self {
             ConverterType::Pandoc => pandoc::PandocConverter::sniff_static(name),
             ConverterType::Calibre => calibre::CalibreConverter::sniff_static(name),
@@ -190,8 +190,8 @@ impl FormatReader for ConvertReader {
         self.converter_type.extensions()
     }
 
-    fn sniff(&self, name: &str, _head: &[u8]) -> Confidence {
-        self.converter_type.sniff(name)
+    fn sniff(&self, name: &str, head: &[u8]) -> Confidence {
+        self.converter_type.sniff(name, head)
     }
 
     async fn open(&self, path: &Path) -> Result<Box<dyn SourceDocument + 'static>, FormatError> {

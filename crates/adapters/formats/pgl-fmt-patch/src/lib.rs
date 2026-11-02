@@ -293,7 +293,7 @@ impl FormatReader for PatchFormatReader {
     }
 
     fn sniff(&self, name: &str, head: &[u8]) -> Confidence {
-        sniff_zip_format(Path::new(name), self.extensions)
+        sniff_zip_format(Path::new(name), head, self.extensions)
     }
 
     async fn open(&self, path: &Path) -> Result<Box<dyn SourceDocument + 'static>, FormatError> {
@@ -424,8 +424,8 @@ impl FormatReader for OdtReader {
         &[".odt"]
     }
 
-    fn sniff(&self, name: &str, _head: &[u8]) -> Confidence {
-        sniff_zip_format(Path::new(name), &[".odt"])
+    fn sniff(&self, name: &str, head: &[u8]) -> Confidence {
+        sniff_zip_format(Path::new(name), head, &[".odt"])
     }
 
     async fn open(&self, path: &Path) -> Result<Box<dyn SourceDocument + 'static>, FormatError> {
@@ -498,8 +498,8 @@ impl FormatReader for OdpReader {
         &[".odp"]
     }
 
-    fn sniff(&self, name: &str, _head: &[u8]) -> Confidence {
-        sniff_zip_format(Path::new(name), &[".odp"])
+    fn sniff(&self, name: &str, head: &[u8]) -> Confidence {
+        sniff_zip_format(Path::new(name), head, &[".odp"])
     }
 
     async fn open(&self, path: &Path) -> Result<Box<dyn SourceDocument + 'static>, FormatError> {
@@ -572,8 +572,8 @@ impl FormatReader for OdsReader {
         &[".ods"]
     }
 
-    fn sniff(&self, name: &str, _head: &[u8]) -> Confidence {
-        sniff_zip_format(Path::new(name), &[".ods"])
+    fn sniff(&self, name: &str, head: &[u8]) -> Confidence {
+        sniff_zip_format(Path::new(name), head, &[".ods"])
     }
 
     async fn open(&self, path: &Path) -> Result<Box<dyn SourceDocument + 'static>, FormatError> {
@@ -646,8 +646,8 @@ impl FormatReader for DocxReader {
         &[".docx"]
     }
 
-    fn sniff(&self, name: &str, _head: &[u8]) -> Confidence {
-        sniff_zip_format(Path::new(name), &[".docx"])
+    fn sniff(&self, name: &str, head: &[u8]) -> Confidence {
+        sniff_zip_format(Path::new(name), head, &[".docx"])
     }
 
     async fn open(&self, path: &Path) -> Result<Box<dyn SourceDocument + 'static>, FormatError> {
@@ -720,8 +720,8 @@ impl FormatReader for PptxReader {
         &[".pptx"]
     }
 
-    fn sniff(&self, name: &str, _head: &[u8]) -> Confidence {
-        sniff_zip_format(Path::new(name), &[".pptx"])
+    fn sniff(&self, name: &str, head: &[u8]) -> Confidence {
+        sniff_zip_format(Path::new(name), head, &[".pptx"])
     }
 
     async fn open(&self, path: &Path) -> Result<Box<dyn SourceDocument + 'static>, FormatError> {
@@ -794,8 +794,8 @@ impl FormatReader for XlsxReader {
         &[".xlsx"]
     }
 
-    fn sniff(&self, name: &str, _head: &[u8]) -> Confidence {
-        sniff_zip_format(Path::new(name), &[".xlsx"])
+    fn sniff(&self, name: &str, head: &[u8]) -> Confidence {
+        sniff_zip_format(Path::new(name), head, &[".xlsx"])
     }
 
     async fn open(&self, path: &Path) -> Result<Box<dyn SourceDocument + 'static>, FormatError> {
@@ -868,8 +868,8 @@ impl FormatReader for EpubReader {
         &[".epub"]
     }
 
-    fn sniff(&self, name: &str, _head: &[u8]) -> Confidence {
-        sniff_zip_format(Path::new(name), &[".epub"])
+    fn sniff(&self, name: &str, head: &[u8]) -> Confidence {
+        sniff_zip_format(Path::new(name), head, &[".epub"])
     }
 
     async fn open(&self, path: &Path) -> Result<Box<dyn SourceDocument + 'static>, FormatError> {
@@ -942,8 +942,8 @@ impl FormatReader for HtmlReader {
         &[".html", ".htm", ".xhtml"]
     }
 
-    fn sniff(&self, name: &str, _head: &[u8]) -> Confidence {
-        sniff_zip_format(Path::new(name), &[".html", ".htm", ".xhtml"])
+    fn sniff(&self, name: &str, head: &[u8]) -> Confidence {
+        sniff_zip_format(Path::new(name), head, &[".html", ".htm", ".xhtml"])
     }
 
     async fn open(&self, path: &Path) -> Result<Box<dyn SourceDocument + 'static>, FormatError> {

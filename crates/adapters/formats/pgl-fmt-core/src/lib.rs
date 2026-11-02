@@ -179,14 +179,13 @@ pub fn default_zip_fidelity() -> FidelityReport {
 }
 
 /// Função utilitária para sniffing de ZIP-based formats
-pub fn sniff_zip_format(path: &Path, expected_files: &[&str]) -> Confidence {
+pub fn sniff_zip_format(path: &Path, head: &[u8], expected_files: &[&str]) -> Confidence {
     let name = path.file_name().and_then(|s| s.to_str()).unwrap_or("");
 
     // Verifica extensão
     let ext_match = expected_files.iter().any(|ext| name.ends_with(ext));
 
-    // Verifica magic bytes (PK para ZIP)
-    let head = std::fs::read(path).unwrap_or_default();
+    // Verifica magic bytes (PK para ZIP) usando head já fornecido
     let zip_match = head.len() >= 4 && &head[0..4] == b"PK\x03\x04";
 
     match (ext_match, zip_match) {
@@ -243,7 +242,8 @@ mod tests {
         let epub_path = path.with_extension("epub");
         std::fs::rename(&path, &epub_path).unwrap();
 
-        let conf = sniff_zip_format(&epub_path, &[".epub"]);
+        let head = std::fs::read(&epub_path).unwrap_or_default();
+        let conf = sniff_zip_format(&epub_path, &head, &[".epub"]);
         assert_eq!(conf.value(), 100); // certain
 
         std::fs::remove_file(epub_path).ok();

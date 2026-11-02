@@ -47,8 +47,8 @@ impl FormatReader for OdtReader {
         &[".odt"]
     }
 
-    fn sniff(&self, name: &str, _head: &[u8]) -> Confidence {
-        sniff_zip_format(Path::new(name), &[".odt"])
+    fn sniff(&self, name: &str, head: &[u8]) -> Confidence {
+        sniff_zip_format(Path::new(name), head, &[".odt"])
     }
 
     async fn open(&self, path: &Path) -> Result<Box<dyn SourceDocument + 'static>, FormatError> {
@@ -109,8 +109,8 @@ impl FormatReader for OdpReader {
         &[".odp"]
     }
 
-    fn sniff(&self, name: &str, _head: &[u8]) -> Confidence {
-        sniff_zip_format(Path::new(name), &[".odp"])
+    fn sniff(&self, name: &str, head: &[u8]) -> Confidence {
+        sniff_zip_format(Path::new(name), head, &[".odp"])
     }
 
     async fn open(&self, path: &Path) -> Result<Box<dyn SourceDocument + 'static>, FormatError> {
@@ -171,8 +171,8 @@ impl FormatReader for OdsReader {
         &[".ods"]
     }
 
-    fn sniff(&self, name: &str, _head: &[u8]) -> Confidence {
-        sniff_zip_format(Path::new(name), &[".ods"])
+    fn sniff(&self, name: &str, head: &[u8]) -> Confidence {
+        sniff_zip_format(Path::new(name), head, &[".ods"])
     }
 
     async fn open(&self, path: &Path) -> Result<Box<dyn SourceDocument + 'static>, FormatError> {

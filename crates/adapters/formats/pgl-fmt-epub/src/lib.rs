@@ -35,8 +35,8 @@ impl FormatReader for EpubReader {
         &[".epub"]
     }
 
-    fn sniff(&self, name: &str, _head: &[u8]) -> Confidence {
-        sniff_zip_format(Path::new(name), &[".epub"])
+    fn sniff(&self, name: &str, head: &[u8]) -> Confidence {
+        sniff_zip_format(Path::new(name), head, &[".epub"])
     }
 
     async fn open(&self, path: &Path) -> Result<Box<dyn SourceDocument + 'static>, FormatError> {
