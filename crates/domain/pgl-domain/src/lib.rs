@@ -23,10 +23,11 @@ use std::fmt;
 use std::hash::{Hash, Hasher};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+use blake3;
 
 /// Identificador único de unidade de tradução
 ///
-/// Estável: hash(source_ref + texto original)
+/// Estável: hash(source_ref + texto original) usando BLAKE3 (128 bits)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct UnitId(pub Uuid);
 
@@ -36,11 +37,21 @@ impl UnitId {
         Self(Uuid::now_v7())
     }
 
-    /// Cria um ID determinístico a partir de um hash u64
+    /// Cria um ID determinístico a partir de um hash BLAKE3 (128 bits)
     pub fn from_hash(hash: u64) -> Self {
+        // Compatibilidade: aceita u64 (SipHash) e expande para 128 bits
         let mut bytes = [0u8; 16];
         bytes[..8].copy_from_slice(&hash.to_le_bytes());
+        // Usa BLAKE3 para derivar 128 bits adicionais
+        let hash = blake3::hash(&bytes[..8]);
+        bytes[8..].copy_from_slice(&hash.as_bytes()[..8]);
         Self(Uuid::from_bytes(bytes))
+    }
+
+    /// Cria um ID determinístico a partir de dados arbitrários usando BLAKE3 (128 bits)
+    pub fn from_data(data: &[u8]) -> Self {
+        let hash = blake3::hash(data);
+        Self(Uuid::from_bytes(*<&[u8; 16]>::try_from(&hash.as_bytes()[..16]).unwrap()))
     }
 
     /// Cria um ID determinístico a partir de um hash de 16 bytes

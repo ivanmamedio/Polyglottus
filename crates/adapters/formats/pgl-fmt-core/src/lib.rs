@@ -145,11 +145,9 @@ impl<R: Read + Seek + Send + Sync + 'static> pgl_app::SourceDocument for ZipSour
 
 /// Helper para criar UnitId determinístico
 pub fn make_unit_id(source_ref: &SourceRef, text: &str) -> UnitId {
-    use std::hash::{Hash, Hasher};
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    source_ref.hash(&mut hasher);
-    text.hash(&mut hasher);
-    UnitId::from_hash(hasher.finish())
+    let hash = blake3::hash(&[source_ref.internal_path.as_bytes(), source_ref.selector.as_bytes(), text.as_bytes()].concat());
+    let hash_bytes: [u8; 16] = *<&[u8; 16]>::try_from(&hash.as_bytes()[..16]).unwrap();
+    UnitId::from_hash_bytes(&hash_bytes)
 }
 
 /// Helper para criar SourceRef padrão

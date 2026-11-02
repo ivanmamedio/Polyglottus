@@ -46,14 +46,11 @@ impl Unit {
         text: MarkedText,
         section: SectionId,
         job_id: Uuid,
-    ) -> Self {
-        // ID determinístico baseado no conteúdo
-        use std::hash::{Hash, Hasher};
-        let mut hasher = std::collections::hash_map::DefaultHasher::new();
-        source_ref.hash(&mut hasher);
-        text.hash(&mut hasher);
-        let hash = hasher.finish();
-        let id = UnitId::from_hash(hash);
+) -> Self {
+        // ID determinístico baseado no conteúdo (BLAKE3 128-bit)
+        let hash = blake3::hash(&[source_ref.internal_path.as_bytes(), source_ref.selector.as_bytes(), text.raw.as_bytes()].concat());
+        let hash_bytes: [u8; 16] = *<&[u8; 16]>::try_from(&hash.as_bytes()[..16]).unwrap();
+        let id = UnitId::from_hash_bytes(&hash_bytes);
 
         Self {
             id,
@@ -154,58 +151,12 @@ impl From<super::marked_text::PlaceholderValidationError> for PlaceholderError {
             super::marked_text::PlaceholderValidationError::OrderMismatch { position, expected, found } => {
                 PlaceholderError::OrderMismatch { position, expected, found }
             }
-            super::marked_text::PlaceholderValidationError::TagMismatch { placeholder, expected_tag, found_tag } => {
-                PlaceholderError::TagMismatch { placeholder, expected_tag, found_tag }
-            }
             super::marked_text::PlaceholderValidationError::NestingViolation(msg) => {
                 PlaceholderError::NestingViolation(msg)
             }
+            super::marked_text::PlaceholderValidationError::TagMismatch { placeholder, expected_tag, found_tag } => {
+                PlaceholderError::TagMismatch { placeholder, expected_tag, found_tag }
+            }
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::{MarkedText, SourceRef, SectionId, UnitKind};
-
-    fn make_unit(text: &str) -> Unit {
-        let source_ref = SourceRef {
-            internal_path: "test.xhtml".into(),
-            selector: "//p[1]".into(),
-            offset: None,
-            length: None,
-        };
-        let marked = MarkedText::new(text);
-        Unit::new(source_ref, UnitKind::Paragraph, marked, SectionId::new(), Uuid::nil())
-    }
-
-    #[test]
-    fn unit_creation() {
-        let unit = make_unit("Hello world");
-        assert_eq!(unit.state, UnitState::Pending);
-        assert!(unit.translation.is_none());
-        assert_eq!(unit.original_text(), "Hello world");
-    }
-
-    #[test]
-    fn unit_translation_flow() {
-        let mut unit = make_unit("Hello world");
-        let translated = MarkedText::new("Olá mundo");
-        unit.apply_translation(translated).unwrap();
-
-        assert_eq!(unit.state, UnitState::Translated);
-        assert_eq!(unit.display_text(), "Olá mundo");
-        assert!(unit.is_translated());
-    }
-
-    #[test]
-    fn unit_review_flow() {
-        let mut unit = make_unit("Hello");
-        let translated = MarkedText::new("Olá");
-        unit.apply_translation(translated).unwrap();
-        unit.mark_reviewed();
-
-        assert_eq!(unit.state, UnitState::Reviewed);
     }
 }

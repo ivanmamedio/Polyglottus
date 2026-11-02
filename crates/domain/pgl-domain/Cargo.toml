@@ -20,6 +20,7 @@ csv = { workspace = true }
 regex = { workspace = true }
 comrak = { version = "0.20", features = ["default"] }
 html5ever = { workspace = true }
+blake3 = "1"
 
 [dev-dependencies]
 proptest = { workspace = true }

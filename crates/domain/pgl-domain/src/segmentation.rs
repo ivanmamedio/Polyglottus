@@ -108,13 +108,7 @@ impl Segmenter {
 
             let marked = MarkedText::new(part);
             segments.push(Segment {
-                id: UnitId::from_hash({
-                    use std::hash::{Hash, Hasher};
-                    let mut h = std::collections::hash_map::DefaultHasher::new();
-                    unit.id.hash(&mut h);
-                    position.hash(&mut h);
-                    h.finish()
-                }),
+                id: UnitId::from_data(unit.id.0.as_bytes()),
                 text: marked,
                 context_before: None,
                 context_after: None,
