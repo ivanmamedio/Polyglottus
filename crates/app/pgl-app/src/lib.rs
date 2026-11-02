@@ -980,3 +980,279 @@ pub mod registry {
         }
     }
 }
+/// PromptBuilder - Builder compartilhado para prompts de tradução
+/// 
+/// Elimina duplicação de lógica de prompt entre providers (OpenAI, Ollama, Embedded)
+pub mod prompt {
+    use pgl_domain::{TranslateRequest, Glossary, StyleGuide, Language, Unit, UnitKind};
+    use std::fmt::Write;
+
+    /// Configuração do estilo do prompt
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub enum PromptStyle {
+        /// Estilo OpenAI (ChatML: system + user)
+        OpenAI,
+        /// Estilo Ollama (prompt único com roles)
+        Ollama,
+        /// Estilo Embedded/Llama (formato ### System/### User/### Assistant)
+        Embedded,
+    }
+
+    /// Builder para prompts de tradução
+    pub struct PromptBuilder {
+        req: TranslateRequest,
+        style: PromptStyle,
+        include_segment_types: bool,
+        include_confidence: bool,
+    }
+
+    impl PromptBuilder {
+        pub fn new(req: TranslateRequest, style: PromptStyle) -> Self {
+            Self {
+                req,
+                style,
+                include_segment_types: true,
+                include_confidence: false,
+            }
+        }
+
+        pub fn include_segment_types(mut self, val: bool) -> Self {
+            self.include_segment_types = val;
+            self
+        }
+
+        pub fn include_confidence(mut self, val: bool) -> Self {
+            self.include_confidence = val;
+            self
+        }
+
+        /// Constrói o system prompt
+        pub fn build_system_prompt(&self) -> String {
+            let mut parts = Vec::new();
+
+            // Header
+            match self.style {
+                PromptStyle::OpenAI => {
+                    parts.push(format!(
+                        "You are a professional translator. Translate from {} to {}.",
+                        self.req.lang_pair.source, self.req.lang_pair.target
+                    ));
+                }
+                PromptStyle::Ollama => {
+                    parts.push(format!(
+                        "You are a professional translator. Translate from {} to {}.",
+                        self.req.lang_pair.source, self.req.lang_pair.target
+                    ));
+                }
+                PromptStyle::Embedded => {
+                    parts.push(format!(
+                        "### System:\nYou are a professional translator. Translate from {} to {}.\n",
+                        self.req.lang_pair.source, self.req.lang_pair.target
+                    ));
+                }
+            }
+
+            // Rules
+            let rules = match self.style {
+                PromptStyle::Embedded => "Rules:\n1. Preserve all markup placeholders exactly (e.g., ⟦1⟧...⟦/1⟧)\n2. Maintain the same formatting, numbers, dates, and proper nouns\n3. Do not add explanations, only the translation\n",
+                _ => "Rules:\n1. Preserve all markup placeholders exactly (e.g., ⟦1⟧...⟦/1⟧)\n2. Maintain the same formatting, numbers, dates, and proper nouns\n3. Do not add explanations, only the translation\n4. Match the tone and style of the original.",
+            };
+            parts.push(rules.into());
+
+            // Glossary
+            if let Some(glossary) = &self.req.glossary {
+                parts.push("\nGlossary (MUST follow):".into());
+                for entry in glossary.terms_sorted() {
+                    if entry.do_not_translate {
+                        let msg = match self.style {
+                            PromptStyle::OpenAI => format!("- '{}' → DO NOT TRANSLATE (keep as '{}')", entry.source_term, entry.source_term),
+                            _ => format!("- '{}' → DO NOT TRANSLATE", entry.source_term),
+                        };
+                        parts.push(msg);
+                    } else {
+                        parts.push(format!("- '{}' → '{}'", entry.source_term, entry.target_term));
+                    }
+                }
+
+        }
+
+        // Style guide
+        if let Some(style) = &self.req.style_guide {
+            parts.push("\nStyle Guide:".into());
+            parts.push(style.to_system_prompt());
+        }
+
+        // Context
+        if let Some(ctx) = &self.req.context {
+            parts.push(format!("\nContext: {}", ctx));
+        }
+
+        // Join based on style
+        match self.style {
+            PromptStyle::OpenAI => parts.join("\n"),
+            PromptStyle::Ollama => parts.join("\n"),
+            PromptStyle::Embedded => parts.join(""),
+        }
+    }
+
+    /// Constrói o user prompt
+    pub fn build_user_prompt(&self) -> String {
+        let mut parts = Vec::new();
+
+        match self.style {
+            PromptStyle::OpenAI => {
+                parts.push(format!("Translate the following {} segments:", self.req.units.len()));
+            }
+            PromptStyle::Ollama => {
+                parts.push("Segments to translate:".into());
+            }
+            PromptStyle::Embedded => {
+                parts.push("\n### User:\nTranslate the following segments:\n".into());
+            }
+        }
+
+        for (i, unit) in self.req.units.iter().enumerate() {
+            let segment_header = match self.style {
+                PromptStyle::OpenAI => format!("\n--- Segment {} (ID: {}) ---", i + 1, unit.id),
+                PromptStyle::Ollama => format!("\n--- Segment {} ---", i + 1),
+                PromptStyle::Embedded => format!("\n--- Segment {} ---\nType: {:?}\nText: {}", i + 1, unit.kind, unit.text.raw),
+            };
+            parts.push(segment_header);
+
+            if self.include_segment_types && self.style != PromptStyle::Embedded {
+                parts.push(format!("Type: {:?}", unit.kind));
+            }
+
+            parts.push(format!("Text: {}", unit.text.raw));
+        }
+
+        // Instruction
+        let instruction = match self.style {
+            PromptStyle::OpenAI => "\n\nReturn JSON with translations array matching the segment order.",
+            PromptStyle::Ollama => "\n\nReturn ONLY a JSON object with 'translations' array of objects with 'translated_text' and optional 'confidence' fields.",
+            PromptStyle::Embedded => "\n\n### Assistant:\nReturn ONLY a JSON object with 'translations' array of objects with 'translated_text' and optional 'confidence' fields.",
+        };
+        parts.push(instruction.into());
+
+        // Join based on style
+        match self.style {
+            PromptStyle::OpenAI => parts.join("\n"),
+            PromptStyle::Ollama => parts.join("\n"),
+            PromptStyle::Embedded => parts.join(""),
+        }
+    }
+
+    /// Constrói prompt completo (system + user)
+    pub fn build(&self) -> (String, String) {
+        let system = self.build_system_prompt();
+        let user = self.build_user_prompt();
+        (system, user)
+    }
+
+    /// Constrói prompt único (para Ollama/Embedded)
+    pub fn build_single(&self) -> String {
+        match self.style {
+            PromptStyle::OpenAI => self.build_user_prompt(), // OpenAI usa system + user separados
+            PromptStyle::Ollama => {
+                let mut parts = Vec::new();
+                parts.push(self.build_system_prompt());
+                parts.push(self.build_user_prompt());
+                parts.join("\n\n")
+            }
+            PromptStyle::Embedded => {
+                let mut parts = Vec::new();
+                parts.push(self.build_system_prompt());
+                parts.push(self.build_user_prompt());
+                parts.join("")
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pgl_domain::{Language, LangPair, Glossary, TranslateRequest, Unit, UnitId, UnitKind, MarkedText, SourceRef, SectionId};
+    use uuid::Uuid;
+
+    fn make_test_request() -> TranslateRequest {
+        let lang_pair = LangPair {
+            source: Language::new("en"),
+            target: Language::new("pt"),
+        };
+        let mut req = TranslateRequest {
+            units: vec![
+                Unit::new(
+                    SourceRef { internal_path: "test.xhtml".into(), selector: "//p[1]".into(), offset: None, length: None },
+                    UnitKind::Paragraph,
+                    MarkedText::new("Hello world"),
+                    pgl_domain::SectionId::new(),
+                    Uuid::nil(),
+                ),
+            ],
+            lang_pair,
+            glossary: None,
+            style_guide: None,
+            context: None,
+            model_id: None,
+            temperature: None,
+            max_tokens: None,
+        };
+        
+        // Add glossary
+        let mut glossary = Glossary::new(Language::new("en"), Language::new("pt"));
+        glossary.add_entry(pgl_domain::GlossaryEntry {
+            source_term: "Hello".into(),
+            target_term: "Olá".into(),
+            context: None,
+            category: Some("greeting".into()),
+            case_sensitive: false,
+            do_not_translate: false,
+            priority: 80,
+        });
+        req.glossary = Some(glossary);
+        
+        req
+    }
+
+    #[test]
+    fn prompt_builder_openai() {
+        let req = make_test_request();
+        let builder = PromptBuilder::new(req, PromptStyle::OpenAI);
+        let (system, user) = builder.build();
+        
+        assert!(system.contains("You are a professional translator"));
+        assert!(system.contains("en to pt"));
+        assert!(system.contains("Glossary"));
+        assert!(system.contains("Hello"));
+        assert!(system.contains("Olá"));
+        assert!(user.contains("Hello world"));
+        assert!(user.contains("Return JSON"));
+    }
+
+    #[test]
+    fn prompt_builder_ollama() {
+        let req = make_test_request();
+        let builder = PromptBuilder::new(req, PromptStyle::Ollama);
+        let prompt = builder.build_single();
+        
+        assert!(prompt.contains("professional translator"));
+        assert!(prompt.contains("Glossary"));
+        assert!(prompt.contains("Hello"));
+        assert!(prompt.contains("Olá"));
+        assert!(prompt.contains("Return ONLY a JSON"));
+    }
+
+    #[test]
+    fn prompt_builder_embedded() {
+        let req = make_test_request();
+        let builder = PromptBuilder::new(req, PromptStyle::Embedded);
+        let prompt = builder.build_single();
+        
+        assert!(prompt.contains("### System:"));
+        assert!(prompt.contains("### User:"));
+        assert!(prompt.contains("### Assistant:"));
+        assert!(prompt.contains("Glossary"));
+    }
+}
+}
