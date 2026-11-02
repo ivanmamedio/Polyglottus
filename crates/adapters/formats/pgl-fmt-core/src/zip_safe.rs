@@ -69,6 +69,12 @@ pub fn extract_entry_streaming<W: std::io::Write>(
 ) -> Result<u64, FormatError> {
     let mut entry = archive.by_index(index)?;
 
+    // Valida path traversal
+    let entry_name = entry.name();
+    if PathBuf::from(entry_name).components().any(|c| matches!(c, std::path::Component::ParentDir)) {
+        return Err(FormatError::ParseError("Zip slip detected in entry".into()));
+    }
+
     // Verificações adicionais
     if entry.size() > MAX_UNCOMPRESSED_SIZE {
         return Err(FormatError::ParseError("Entry too large".into()));
@@ -96,6 +102,14 @@ pub fn extract_entry_streaming<W: std::io::Write>(
 pub fn extract_entry_bytes<R: Read + Seek>(archive: &mut ZipArchive<R>, index: usize) -> Result<Vec<u8>, FormatError> {
     let mut entry = archive.by_index(index)?;
 
+    // Valida path traversal
+    if entry.enclosed_name().is_none() {
+        return Err(FormatError::ParseError("Zip slip detected in entry".into()));
+    }
+    if PathBuf::from(entry.name()).components().any(|c| matches!(c, std::path::Component::ParentDir)) {
+        return Err(FormatError::ParseError("Zip slip detected in entry".into()));
+    }
+
     if entry.size() > 50 * 1024 * 1024 { // 50 MB limite para carregar na memória
         return Err(FormatError::ParseError("Entry too large for memory extraction".into()));
     }
@@ -107,6 +121,12 @@ pub fn extract_entry_bytes<R: Read + Seek>(archive: &mut ZipArchive<R>, index: u
 
 /// Extrai entrada para bytes pelo nome
 pub fn extract_entry_bytes_by_name<R: Read + Seek>(archive: &mut ZipArchive<R>, name: &str) -> Result<Vec<u8>, FormatError> {
+    // Valida path traversal no nome solicitado
+    let path = PathBuf::from(name);
+    if path.components().any(|c| matches!(c, std::path::Component::ParentDir)) {
+        return Err(FormatError::ParseError("Zip slip detected in requested path".into()));
+    }
+
     let index = archive.file_names()
         .position(|n| n == name)
         .ok_or_else(|| FormatError::ParseError(format!("Entry not found: {}", name)))?;
@@ -229,5 +249,40 @@ mod tests {
         let _result = open_zip_safe(f.path());
         // Nota: zip::CompressionMethod::Stored não comprime, então este teste
         // depende do método de compressão usado. Em produção, usar Deflated.
+    }
+
+    #[test]
+    fn zip_slip_prevention_streaming() {
+        let f = NamedTempFile::new().unwrap();
+        {
+            let file = File::create(f.path()).unwrap();
+            let mut zip = create_zip_safe(file).unwrap();
+            // Tenta adicionar arquivo com path traversal
+            let result = add_entry_safe(&mut zip, "../etc/passwd", b"evil");
+            assert!(result.is_err());
+            zip.finish().unwrap();
+        }
+
+        // Tenta extrair via streaming - deve falhar
+        let mut archive = open_zip_safe(f.path()).unwrap();
+        let mut buffer = Vec::new();
+        let result = extract_entry_streaming(&mut archive, 0, &mut buffer);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn zip_slip_prevention_extract_bytes() {
+        let f = NamedTempFile::new().unwrap();
+        {
+            let file = File::create(f.path()).unwrap();
+            let mut zip = create_zip_safe(file).unwrap();
+            add_entry_safe(&mut zip, "safe.txt", b"safe").unwrap();
+            zip.finish().unwrap();
+        }
+
+        let mut archive = open_zip_safe(f.path()).unwrap();
+        // Tenta extrair by name com path traversal
+        let result = extract_entry_bytes_by_name(&mut archive, "../etc/passwd");
+        assert!(result.is_err());
     }
 }
