@@ -10,6 +10,7 @@ use uuid::Uuid;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Job {
     pub id: Uuid,
+    pub project_id: Uuid,
     pub config: JobConfig,
     pub state: JobState,
     pub progress: JobProgress,
@@ -26,10 +27,11 @@ pub struct Job {
 
 impl Job {
     /// Cria novo job
-    pub fn new(config: JobConfig) -> Self {
+    pub fn new(config: JobConfig, project_id: Uuid) -> Self {
         let now = SystemTime::now();
         Self {
             id: Uuid::now_v7(),
+            project_id,
             config,
             state: JobState::Created,
             progress: JobProgress::default(),
@@ -307,7 +309,7 @@ mod tests {
     use crate::{Language, Unit, UnitKind, MarkedText, SourceRef, SectionId};
 
     fn make_job() -> Job {
-        Job::new(JobConfig::default())
+        Job::new(JobConfig::default(), Uuid::nil())
     }
 
     fn make_unit(text: &str) -> Unit {

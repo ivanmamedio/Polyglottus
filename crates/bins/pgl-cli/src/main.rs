@@ -19,6 +19,7 @@ use pgl_fmt_convert::{ConverterRegistry, ConvertReader, ConvertWriter, Converter
 use pgl_provider_openai::OpenAICompatProvider;
 use pgl_provider_ollama::OllamaProvider;
 use pgl_provider_embedded::EmbeddedProvider;
+use pgl_testkit::FakeProvider;
 use pgl_ocr::OcrEngineFactory;
 use pgl_storage::SqliteRepository;
 use pgl_secrets::SystemSecretStore;
@@ -85,12 +86,12 @@ async fn execute_translation(
     }
 
     job.start();
-    repo.save_job(&job).await?;
+    repo.save_job(&job, &job.project_id).await?;
 
     // Loop de processamento em lotes
     while job.can_resume() {
         job.update_progress();
-        repo.save_job(&job).await?;
+        repo.save_job(&job, &job.project_id).await?;
         pb.set_position(job.progress.completed as u64);
 
         let batch = job.pending_units(job.config.batch_size);
@@ -120,7 +121,7 @@ async fn execute_translation(
                         u.fail();
                     }
                 }
-                repo.save_job(&job).await?;
+                repo.save_job(&job, &job.project_id).await?;
                 return Err(anyhow::anyhow!("Translation failed: {}", e));
             }
         };
@@ -166,7 +167,7 @@ async fn execute_translation(
             export_time_ms: 0,
             warnings: vec![],
         });
-        repo.save_job(&job).await?;
+        repo.save_job(&job, &job.project_id).await?;
     }
 
     Ok(())
@@ -421,7 +422,11 @@ async fn main() -> anyhow::Result<()> {
         Commands::Import { input, name, target_lang: _ } => {
             let any_reader = Arc::new(AnyFormatReader::new(fmt_registry.readers().to_vec()));
             let import = ImportBook::new(vec![any_reader], repo.clone());
-            let project = import.execute(&input, name).await?;
+            let mut project = import.execute(&input, name).await?;
+            // Save jobs
+            for job in project.jobs.values() {
+                repo.save_job(job, &project.id).await?;
+            }
             info!("Project created: {} ({})", project.name, project.id);
         }
 
@@ -465,6 +470,10 @@ async fn main() -> anyhow::Result<()> {
             let api_key_final = api_key.unwrap_or(openai_key);
 
             let translation_provider: Arc<dyn TranslationProvider> = match provider.as_str() {
+                "fake" => {
+                    // FakeProvider determinístico para testes
+                    Arc::new(FakeProvider::new(pgl_testkit::FakeMode::Prefix))
+                }
                 "openai" => {
                     let mut config = pgl_provider_openai::OpenAICompatConfig::default();
                     config.api_key = Some(api_key_final);

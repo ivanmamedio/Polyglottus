@@ -51,7 +51,7 @@ impl Project {
 
     /// Adiciona um job ao projeto
     pub fn add_job(&mut self, config: JobConfig) -> Uuid {
-        let job = Job::new(config);
+        let job = Job::new(config, self.id);
         let id = job.id;
         self.jobs.insert(id, job);
         self.updated_at = SystemTime::now();

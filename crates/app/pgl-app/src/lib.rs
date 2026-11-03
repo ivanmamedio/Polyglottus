@@ -380,7 +380,7 @@ pub trait ProjectRepository: Send + Sync + 'static {
     async fn delete_project(&self, id: &Uuid) -> Result<(), StorageError>;
     async fn list_projects(&self) -> Result<Vec<ProjectSummary>, StorageError>;
 
-    async fn save_job(&self, job: &Job) -> Result<(), StorageError>;
+    async fn save_job(&self, job: &Job, project_id: &Uuid) -> Result<(), StorageError>;
     async fn load_job(&self, id: &Uuid) -> Result<Option<Job>, StorageError>;
     async fn list_jobs(&self, project_id: &Uuid) -> Result<Vec<JobSummary>, StorageError>;
 
@@ -687,13 +687,22 @@ pub struct TranslationPlan {
     pub warnings: Vec<String>,
 }
 
-// Job locking para evitar race conditions
-// Job locking para evitar race conditions (lock global serializa todos os jobs)
-static JOB_LOCK: parking_lot::Mutex<()> = parking_lot::Mutex::new(());
+// Job locking para evitar race conditions (lock por job usando DashMap)
+static JOB_LOCKS: std::sync::LazyLock<dashmap::DashMap<Uuid, std::sync::Arc<tokio::sync::Mutex<()>>>> = std::sync::LazyLock::new(dashmap::DashMap::new);
 
-/// Adquire lock global para jobs (serializa todos os jobs, mas evita race conditions)
-async fn acquire_job_lock(_job_id: Uuid) -> parking_lot::MutexGuard<'static, ()> {
-    JOB_LOCK.lock()
+/// Executa uma closure com lock exclusivo para um job específico (permite paralelismo entre jobs diferentes)
+async fn with_job_lock<'a, R>(job_id: Uuid, f: impl FnOnce() -> std::pin::Pin<Box<dyn std::future::Future<Output = R> + Send + 'a>>) -> R
+where
+    R: Send,
+{
+    let mutex_arc = JOB_LOCKS
+        .entry(job_id)
+        .or_insert_with(|| std::sync::Arc::new(tokio::sync::Mutex::new(())))
+        .value()
+        .clone();
+    
+    let guard = mutex_arc.lock().await;
+    f().await
 }
 
 /// Executa job de tradução
@@ -715,113 +724,116 @@ where
     }
 
     pub async fn execute(&self, job_id: Uuid) -> Result<(), AppError> {
-        // Adquire lock exclusivo para este job
-        let _job_lock = acquire_job_lock(job_id).await;
-        
-        let mut job = self.repo.load_job(&job_id).await?
-            .ok_or(AppError::JobNotFound(job_id))?;
+        // Usa lock por job com callback pattern
+        with_job_lock(job_id, || -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), AppError>> + Send>> {
+            Box::pin(async move {
+                let mut job = self.repo.load_job(&job_id).await?
+                    .ok_or(AppError::JobNotFound(job_id))?;
 
-        if !matches!(job.state, JobState::Created | JobState::Paused) {
-            return Err(AppError::Validation("Job cannot be started".into()));
-        }
-
-        job.start();
-        self.repo.save_job(&job).await?;
-        self.events.emit(AppEvent::JobStarted { job_id }).await;
-
-        // Loop de processamento em lotes
-        while job.can_resume() {
-            job.update_progress();
-            self.repo.save_job(&job).await?;
-            self.events.emit(AppEvent::JobProgress { job_id, progress: job.progress.clone() }).await;
-
-            let batch = job.pending_units(job.config.batch_size);
-            if batch.is_empty() { break; }
-
-            // Collect unit IDs to avoid borrow conflicts
-            let unit_ids: Vec<UnitId> = batch.iter().map(|u| u.id).collect();
-
-            // Prepara requisição
-            let req = TranslateRequest {
-                units: batch.iter().map(|u| (*u).clone()).collect(),
-                lang_pair: job.config.lang_pair.clone(),
-                glossary: job.config.glossary.clone(),
-                style_guide: job.config.style_guide.clone(),
-                context: self.build_context(&job, &batch).await,
-                model_id: Some(job.config.model_id.clone()),
-                temperature: Some(job.config.temperature),
-                max_tokens: Some(job.config.max_tokens),
-            };
-
-            // Tradução
-            let response = match self.provider.translate(req).await {
-                Ok(r) => r,
-                Err(e) => {
-                    // Marca unidades como falhadas
-                    for unit_id in &unit_ids {
-                        if let Some(u) = job.unit_mut(unit_id) {
-                            u.fail();
-                        }
-                    }
-                    self.repo.save_job(&job).await?;
-                    return Err(AppError::Provider(e));
+                if !matches!(job.state, JobState::Created | JobState::Paused) {
+                    return Err(AppError::Validation("Job cannot be started".into()));
                 }
-            };
 
-            // Aplica traduções e QA
-            let lang_pair = job.config.lang_pair.clone();
-            let glossary = job.config.glossary.clone();
-            let enable_qa = job.config.enable_qa;
+                job.start();
+                self.repo.save_job(&job, &job.project_id).await?;
+                self.events.emit(AppEvent::JobStarted { job_id }).await;
 
-            let job_id = job.id;
-            for trans in response.translations {
-                if let Some(unit) = job.unit_mut(&trans.unit_id) {
-                    unit.apply_translation(trans.translated_text)?;
+                // Loop de processamento em lotes
+                while job.can_resume() {
+                    job.update_progress();
+                    self.repo.save_job(&job, &job.project_id).await?;
+                    self.events.emit(AppEvent::JobProgress { job_id, progress: job.progress.clone() }).await;
 
-                    // QA
-                    if enable_qa {
-                        let qa_result = self.qa_checker.check(unit, &lang_pair, glossary.as_ref());
-                        if !qa_result.passed {
-                            if qa_result.has_errors {
-                                unit.fail();
-                            } else {
-                                unit.flag(qa_result.warnings.clone());
+                    let batch = job.pending_units(job.config.batch_size);
+                    if batch.is_empty() { break; }
+
+                    // Collect unit IDs to avoid borrow conflicts
+                    let unit_ids: Vec<UnitId> = batch.iter().map(|u| u.id).collect();
+
+                    // Prepara requisição
+                    let req = TranslateRequest {
+                        units: batch.iter().map(|u| (*u).clone()).collect(),
+                        lang_pair: job.config.lang_pair.clone(),
+                        glossary: job.config.glossary.clone(),
+                        style_guide: job.config.style_guide.clone(),
+                        context: self.build_context(&job, &batch).await,
+                        model_id: Some(job.config.model_id.clone()),
+                        temperature: Some(job.config.temperature),
+                        max_tokens: Some(job.config.max_tokens),
+                    };
+
+                    // Tradução
+                    let response = match self.provider.translate(req).await {
+                        Ok(r) => r,
+                        Err(e) => {
+                            // Marca unidades como falhadas
+                            for unit_id in &unit_ids {
+                                if let Some(u) = job.unit_mut(unit_id) {
+                                    u.fail();
+                                }
                             }
+                            self.repo.save_job(&job, &job.project_id).await?;
+                            return Err(AppError::Provider(e));
+                        }
+                    };
+
+                    // Aplica traduções e QA
+                    let lang_pair = job.config.lang_pair.clone();
+                    let glossary = job.config.glossary.clone();
+                    let enable_qa = job.config.enable_qa;
+
+                    let job_id = job.id;
+                    for trans in response.translations {
+                        if let Some(unit) = job.unit_mut(&trans.unit_id) {
+                            unit.apply_translation(trans.translated_text)?;
+
+                            // QA
+                            if enable_qa {
+                                let qa_result = self.qa_checker.check(unit, &lang_pair, glossary.as_ref());
+                                if !qa_result.passed {
+                                    if qa_result.has_errors {
+                                        unit.fail();
+                                    } else {
+                                        unit.flag(qa_result.warnings.clone());
+                                    }
+                                }
+                            }
+
+                            self.repo.save_unit(unit, &job_id).await?;
+                            self.events.emit(AppEvent::UnitTranslated { job_id, unit_id: trans.unit_id }).await;
                         }
                     }
 
-                    self.repo.save_unit(unit, &job_id).await?;
-                    self.events.emit(AppEvent::UnitTranslated { job_id, unit_id: trans.unit_id }).await;
+                    // Pequena pausa para não saturar
+                    tokio::time::sleep(std::time::Duration::from_millis(10)).await;
                 }
-            }
 
-            // Pequena pausa para não saturar
-            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
-        }
+                // Verifica se completou
+                if job.units.values().all(|u| !matches!(u.state, UnitState::Pending)) {
+                    // Exporta
+                    // (implementar exportação aqui)
+                    job.complete(ExportReport {
+                        output_path: "".into(),
+                        format: OutputFormat::SameAsSource,
+                        units_processed: job.units.len(),
+                        units_with_warnings: job.units.values().filter(|u| u.state == UnitState::Flagged).count(),
+                        units_failed: job.units.values().filter(|u| u.state == UnitState::Failed).count(),
+                        output_size: 0,
+                        export_time_ms: 0,
+                        warnings: vec![],
+                    });
+                }
 
-        // Verifica se completou
-        if job.units.values().all(|u| !matches!(u.state, UnitState::Pending)) {
-            // Exporta
-            // (implementar exportação aqui)
-            job.complete(ExportReport {
-                output_path: "".into(),
-                format: OutputFormat::SameAsSource,
-                units_processed: job.units.len(),
-                units_with_warnings: job.units.values().filter(|u| u.state == UnitState::Flagged).count(),
-                units_failed: job.units.values().filter(|u| u.state == UnitState::Failed).count(),
-                output_size: 0,
-                export_time_ms: 0,
-                warnings: vec![],
-            });
-        }
+                self.repo.save_job(&job, &job.project_id).await?;
+                self.events.emit(AppEvent::JobCompleted {
+                    job_id,
+                    report: job.export_report.clone().unwrap(),
+                }).await;
 
-        self.repo.save_job(&job).await?;
-        self.events.emit(AppEvent::JobCompleted {
-            job_id,
-            report: job.export_report.clone().unwrap(),
-        }).await;
-
-        Ok(())
+                Ok(())
+            })
+        })
+        .await
     }
 
     async fn build_context(&self, job: &Job, batch: &[&Unit]) -> Option<String> {
@@ -847,11 +859,11 @@ pub use pgl_domain::qa::QaChecking as QaCheckerTrait;
 pub type QaChecker = dyn pgl_domain::qa::QaChecking;
 
 /// Revisa unidade manualmente
-pub struct ReviewUnit<Repo: ProjectRepository> {
+pub struct ReviewUnit<Repo: crate::ProjectRepository> {
     repo: Arc<Repo>,
 }
 
-impl<Repo: ProjectRepository> ReviewUnit<Repo> {
+impl<Repo: crate::ProjectRepository> ReviewUnit<Repo> {
     pub fn new(repo: Arc<Repo>) -> Self {
         Self { repo }
     }
@@ -876,8 +888,9 @@ impl<Repo: ProjectRepository> ReviewUnit<Repo> {
     }
 
     pub async fn retraduze(&self, unit_id: UnitId) -> Result<(), AppError> {
-        let mut unit = self.repo.load_unit(&unit_id).await?
-            .ok_or(AppError::Validation("Unit not found".into()))?;
+        let result: Result<Option<Unit>, StorageError> = self.repo.load_unit(&unit_id).await;
+        let mut unit = result?
+            .ok_or_else(|| AppError::Validation("Unit not found".into()))?;
         unit.reset();
         let job_id = unit.job_id;
         self.repo.save_unit(&unit, &job_id).await?;

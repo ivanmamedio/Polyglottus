@@ -42,16 +42,11 @@ impl SqliteRepository {
 
     async fn run_migrations(pool: &SqlitePool) -> Result<(), StorageError> {
         // Run migrations from embedded SQL
-        let migrations = include_str!("../migrations/001_initial_schema.sql");
-        for statement in migrations.split(';') {
-            let stmt = statement.trim();
-            if !stmt.is_empty() {
-                sqlx::query(statement)
-                    .execute(pool)
-                    .await
-                    .map_err(|e| StorageError::Migration(e.to_string()))?;
-            }
-        }
+        // Use sqlx's built-in migration support for proper handling
+        sqlx::migrate!("./migrations")
+            .run(pool)
+            .await
+            .map_err(|e| StorageError::Migration(e.to_string()))?;
         Ok(())
     }
 
@@ -122,20 +117,75 @@ impl SqliteRepository {
         .map_err(|e| StorageError::Sqlx(e.into()))?;
 
         if let Some(row) = row {
+            // Load jobs for this project
+            let project_id_str = id.to_string();
+            let job_rows = sqlx::query!(
+                "SELECT id, project_id, config, state, progress, fidelity_report, export_options, export_report, created_at, updated_at, started_at, completed_at FROM jobs WHERE project_id = ?",
+                project_id_str
+            )
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|e| StorageError::Sqlx(e.into()))?;
+
+            let mut jobs = HashMap::new();
+            for job_row in job_rows {
+                let job = Job {
+                    id: Uuid::parse_str(job_row.id.as_deref().unwrap_or("")).unwrap().into(),
+                    project_id: Uuid::parse_str(job_row.project_id.as_ref()).unwrap().into(),
+                    config: serde_json::from_str(&job_row.config).unwrap(),
+                    state: serde_json::from_str(&job_row.state).unwrap(),
+                    progress: serde_json::from_str(&job_row.progress).unwrap(),
+                    fidelity_report: job_row.fidelity_report.as_deref().and_then(|s: &str| {
+                        if s == "null" {
+                            None
+                        } else {
+                            serde_json::from_str(s).ok()
+                        }
+                    }),
+                    export_options: job_row.export_options.as_deref().and_then(|s: &str| {
+                        if s == "null" {
+                            None
+                        } else {
+                            serde_json::from_str(s).ok()
+                        }
+                    }),
+                    export_report: job_row.export_report.as_deref().and_then(|s: &str| {
+                        if s == "null" {
+                            None
+                        } else {
+                            serde_json::from_str(s).ok()
+                        }
+                    }),
+                    created_at: Self::i64_to_system_time(job_row.created_at),
+                    updated_at: Self::i64_to_system_time(job_row.updated_at),
+                    started_at: job_row.started_at.map(Self::i64_to_system_time),
+                    completed_at: job_row.completed_at.map(Self::i64_to_system_time),
+                    units: HashMap::new(),
+                    sections: Vec::new(),
+                };
+                jobs.insert(job.id, job);
+            }
+
             let project = Project {
                 id: Uuid::parse_str(row.id.as_ref().unwrap()).unwrap().into(),
                 name: row.name,
                 source_file: PathBuf::from(&row.source_file),
                 source_format: row.source_format,
                 detected_language: row.detected_language.map(Language::new),
-                fidelity_report: row.fidelity_report.as_deref().map(|s: &str| serde_json::from_str(s).unwrap()),
+                fidelity_report: row.fidelity_report.as_deref().and_then(|s: &str| {
+                    if s == "null" {
+                        None
+                    } else {
+                        serde_json::from_str(s).ok()
+                    }
+                }),
                 export_options: serde_json::from_str(&row.export_options).unwrap(),
                 created_at: Self::i64_to_system_time(row.created_at),
                 updated_at: Self::i64_to_system_time(row.updated_at),
                 metadata: serde_json::from_str(&row.metadata).unwrap(),
-                global_glossary: row.global_glossary.map(|g| serde_json::from_str(&g).unwrap()),
-                global_style_guide: row.global_style_guide.map(|g| serde_json::from_str(&g).unwrap()),
-                jobs: HashMap::new(),
+                global_glossary: row.global_glossary.as_deref().and_then(|s| serde_json::from_str(s).ok()),
+                global_style_guide: row.global_style_guide.as_deref().and_then(|s| serde_json::from_str(s).ok()),
+                jobs,
             };
             Ok(Some(project))
         } else {
@@ -171,7 +221,7 @@ impl SqliteRepository {
         Ok(())
     }
 
-    async fn save_job(&self, job: &Job) -> Result<(), StorageError> {
+    async fn save_job(&self, job: &Job, project_id: &Uuid) -> Result<(), StorageError> {
         let mut tx = self.pool.begin().await.map_err(|e| StorageError::Sqlx(e.into()))?;
 
         let config_json = serde_json::to_string(&job.config).unwrap();
@@ -185,7 +235,7 @@ impl SqliteRepository {
         let started_at = job.started_at.map(Self::system_time_to_i64);
         let completed_at = job.completed_at.map(Self::system_time_to_i64);
         let id_str = job.id.to_string();
-        let project_id_str = "".to_string();
+        let project_id_str = project_id.to_string();
 
         sqlx::query!(
             r#"
@@ -226,7 +276,7 @@ impl SqliteRepository {
     async fn load_job(&self, id: &Uuid) -> Result<Option<Job>, StorageError> {
         let id_str = id.to_string();
         let row = sqlx::query!(
-            "SELECT id, config, state, progress, fidelity_report, export_options, export_report, created_at, updated_at, started_at, completed_at FROM jobs WHERE id = ?",
+            "SELECT id, project_id, config, state, progress, fidelity_report, export_options, export_report, created_at, updated_at, started_at, completed_at FROM jobs WHERE id = ?",
             id_str
         )
         .fetch_optional(&self.pool)
@@ -236,12 +286,31 @@ impl SqliteRepository {
         if let Some(row) = row {
             let job = Job {
                 id: Uuid::parse_str(&id_str).unwrap().into(),
+                project_id: Uuid::parse_str(&row.project_id).unwrap().into(),
                 config: serde_json::from_str(&row.config).unwrap(),
                 state: serde_json::from_str(&row.state).unwrap(),
                 progress: serde_json::from_str(&row.progress).unwrap(),
-                fidelity_report: row.fidelity_report.as_deref().map(|s: &str| serde_json::from_str(s).unwrap()),
-                export_options: row.export_options.as_deref().map(|s: &str| serde_json::from_str(s).unwrap()),
-                export_report: row.export_report.as_deref().map(|s: &str| serde_json::from_str(s).unwrap()),
+                fidelity_report: row.fidelity_report.as_deref().and_then(|s: &str| {
+                    if s == "null" {
+                        None
+                    } else {
+                        serde_json::from_str(s).ok()
+                    }
+                }),
+                export_options: row.export_options.as_deref().and_then(|s: &str| {
+                    if s == "null" {
+                        None
+                    } else {
+                        serde_json::from_str(s).ok()
+                    }
+                }),
+                export_report: row.export_report.as_deref().and_then(|s: &str| {
+                    if s == "null" {
+                        None
+                    } else {
+                        serde_json::from_str(s).ok()
+                    }
+                }),
                 created_at: Self::i64_to_system_time(row.created_at),
                 updated_at: Self::i64_to_system_time(row.updated_at),
                 started_at: row.started_at.map(Self::i64_to_system_time),
@@ -528,8 +597,8 @@ impl ProjectRepository for SqliteRepository {
         self.delete_project(id).await
     }
 
-    async fn save_job(&self, job: &Job) -> Result<(), StorageError> {
-        self.save_job(job).await
+    async fn save_job(&self, job: &Job, project_id: &Uuid) -> Result<(), StorageError> {
+        self.save_job(job, project_id).await
     }
 
     async fn load_job(&self, id: &Uuid) -> Result<Option<Job>, StorageError> {

@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id, config, state, progress, fidelity_report, export_options, export_report, created_at, updated_at, started_at, completed_at FROM jobs WHERE id = ?",
+  "query": "SELECT id, project_id, config, state, progress, fidelity_report, export_options, export_report, created_at, updated_at, started_at, completed_at FROM jobs WHERE id = ?",
   "describe": {
     "columns": [
       {
@@ -9,53 +9,58 @@
         "type_info": "Text"
       },
       {
-        "name": "config",
+        "name": "project_id",
         "ordinal": 1,
         "type_info": "Text"
       },
       {
-        "name": "state",
+        "name": "config",
         "ordinal": 2,
         "type_info": "Text"
       },
       {
-        "name": "progress",
+        "name": "state",
         "ordinal": 3,
         "type_info": "Text"
       },
       {
-        "name": "fidelity_report",
+        "name": "progress",
         "ordinal": 4,
         "type_info": "Text"
       },
       {
-        "name": "export_options",
+        "name": "fidelity_report",
         "ordinal": 5,
         "type_info": "Text"
       },
       {
-        "name": "export_report",
+        "name": "export_options",
         "ordinal": 6,
         "type_info": "Text"
       },
       {
-        "name": "created_at",
+        "name": "export_report",
         "ordinal": 7,
-        "type_info": "Integer"
+        "type_info": "Text"
       },
       {
-        "name": "updated_at",
+        "name": "created_at",
         "ordinal": 8,
         "type_info": "Integer"
       },
       {
-        "name": "started_at",
+        "name": "updated_at",
         "ordinal": 9,
         "type_info": "Integer"
       },
       {
-        "name": "completed_at",
+        "name": "started_at",
         "ordinal": 10,
+        "type_info": "Integer"
+      },
+      {
+        "name": "completed_at",
+        "ordinal": 11,
         "type_info": "Integer"
       }
     ],
@@ -64,6 +69,7 @@
     },
     "nullable": [
       true,
+      false,
       false,
       false,
       false,
@@ -76,5 +82,5 @@
       true
     ]
   },
-  "hash": "9066514dca3ce4e561360c8cb79a857194bb54e198965e90ec2f8b8851cc8cc2"
+  "hash": "0f3e730ad02c8fa4485d337bbc30453a79223e8c9f494843537a4d212067183c"
 }
