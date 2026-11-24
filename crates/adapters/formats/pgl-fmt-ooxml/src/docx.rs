@@ -271,10 +271,116 @@ fn parse_docx_xml(xml: &str) -> Result<(Vec<String>, Vec<Vec<Vec<String>>>), For
 }
 
 /// Traduz DOCX XML aplicando traduções
-fn translate_docx_xml(xml: &str, _translations: &dyn TranslationLookup) -> Result<String, FormatError> {
-    // Por enquanto retorna XML original
-    // Implementação completa requer mapeamento unit_id -> posição no XML
-    Ok(xml.to_string())
+fn translate_docx_xml(
+    xml: &str,
+    translations: &dyn TranslationLookup,
+) -> Result<String, FormatError> {
+    // Coletar traduções indexadas por selector (paragraph[N], table[T]/row[R]/cell[C])
+    let mut para_map: std::collections::HashMap<usize, String> = std::collections::HashMap::new();
+    let mut cell_map: std::collections::HashMap<(usize, usize, usize), String> = std::collections::HashMap::new();
+
+    for (source_ref, translation) in translations.all_with_refs() {
+        let sel = &source_ref.selector;
+        if let Some(idx) = sel.strip_prefix("paragraph[").and_then(|s| s.strip_suffix("]")).and_then(|s| s.parse::<usize>().ok()) {
+            para_map.insert(idx, translation.raw.clone());
+        } else if let Some(rest) = sel.strip_prefix("table[") {
+            let parts: Vec<&str> = rest.split('/').collect();
+            if parts.len() == 3 {
+                let t = parts[0].strip_suffix("]").and_then(|s| s.parse::<usize>().ok()).unwrap_or(0);
+                let r = parts[1].strip_prefix("row[").and_then(|s| s.strip_suffix("]")).and_then(|s| s.parse::<usize>().ok()).unwrap_or(0);
+                let c = parts[2].strip_prefix("cell[").and_then(|s| s.strip_suffix("]")).and_then(|s| s.parse::<usize>().ok()).unwrap_or(0);
+                cell_map.insert((t, r, c), translation.raw.clone());
+            }
+        }
+    }
+
+    if para_map.is_empty() && cell_map.is_empty() {
+        return Ok(xml.to_string());
+    }
+
+    // Parse XML e reescrever com traduções aplicadas a elementos w:t
+    let mut reader = Reader::from_str(xml);
+    reader.trim_text(true);
+    let mut writer = XmlWriter::new(Vec::new());
+
+    let mut buf = Vec::new();
+    let mut para_idx = 0usize;
+    let mut table_idx = 0usize;
+    let mut row_idx = 0usize;
+    let mut cell_idx = 0usize;
+    let mut in_w_t = false;
+    let mut in_table = false;
+    let mut in_row = false;
+    let mut in_cell = false;
+
+    loop {
+        match reader.read_event(&mut buf) {
+            Ok(Event::Start(ref e)) => {
+                let tag_name = String::from_utf8_lossy(e.name().as_ref()).to_string();
+                let tag_lower = tag_name.to_lowercase();
+
+                if tag_lower == "w:t" {
+                    in_w_t = true;
+                }
+                if tag_lower == "w:tbl" { in_table = true; table_idx = 0; row_idx = 0; cell_idx = 0; }
+                if tag_lower == "w:tr" { in_row = true; row_idx = 0; cell_idx = 0; }
+                if tag_lower == "w:tc" { in_cell = true; cell_idx = 0; }
+
+                writer.write_event(Event::Start(e.clone()))?;
+            }
+            Ok(Event::Text(t)) => {
+                let text = t.unescape()?.to_string();
+                let mut new_text = text.clone();
+
+                if in_w_t {
+                    if in_table && in_row && in_cell {
+                        if let Some(translated) = cell_map.get(&(table_idx, row_idx, cell_idx)) {
+                            new_text = translated.clone();
+                        }
+                    } else if !in_table {
+                        if let Some(translated) = para_map.get(&para_idx) {
+                            new_text = translated.clone();
+                        }
+                    }
+                }
+
+                writer.write_event(Event::Text(BytesText::new(new_text)))?;
+            }
+            Ok(Event::End(ref e)) => {
+                let tag_name = String::from_utf8_lossy(e.name().as_ref()).to_string();
+                let tag_lower = tag_name.to_lowercase();
+
+                if tag_lower == "w:t" {
+                    in_w_t = false;
+                    if !in_table {
+                        para_idx += 1;
+                    }
+                }
+                if tag_lower == "w:tc" {
+                    in_cell = false;
+                    cell_idx += 1;
+                }
+                if tag_lower == "w:tr" {
+                    in_row = false;
+                    row_idx += 1;
+                }
+                if tag_lower == "w:tbl" {
+                    in_table = false;
+                    table_idx += 1;
+                }
+
+                writer.write_event(Event::End(e.clone()))?;
+            }
+            Ok(Event::Eof) => break,
+            Ok(e) => writer.write_event(e)?,
+            Err(e) => return Err(FormatError::Xml(e)),
+        }
+        buf.clear();
+    }
+
+    let result = String::from_utf8(writer.into_inner())
+        .map_err(|e| FormatError::Utf8(e))?;
+    Ok(result)
 }
 
 #[cfg(test)]
