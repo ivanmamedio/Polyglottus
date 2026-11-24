@@ -92,7 +92,7 @@ impl From<pgl_app::ProjectSummary> for ProjectSummary {
             id: p.id.to_string(),
             name: p.name,
             source_file: p.source_file,
-            source_format: p.source_format,
+            source_format: p.source_format.clone(),
             created_at: p.created_at,
             updated_at: p.updated_at,
             overall_progress: p.overall_progress,
