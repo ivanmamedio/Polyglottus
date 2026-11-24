@@ -9,7 +9,7 @@ use pgl_domain::{Language, ExportOptions, OutputFormat, JobConfig, UnitId, UnitS
 use pgl_fmt_epub::{EpubReader, EpubWriter};
 use pgl_fmt_ooxml::{DocxReader, DocxWriter, PptxReader, PptxWriter, XlsxReader, XlsxWriter};
 use pgl_fmt_odf::{OdtReader, OdtWriter, OdpReader, OdpWriter, OdsReader, OdsWriter};
-use pgl_fmt_text::{TxtReader, TxtWriter, MdReader, MdWriter, SrtReader, SrtWriter, VttReader, VttWriter, PoReader, PoWriter, XliffReader, XliffWriter, TmxReader, TmxWriter, JsonI18nReader, JsonI18nWriter};
+use pgl_fmt_text::{TxtReader, TxtWriter, MdReader, MdWriter, SrtReader, SrtWriter, VttReader, VttWriter, HtmlTextReader, HtmlTextWriter, PoReader, PoWriter, XliffReader, XliffWriter, TmxReader, TmxWriter, JsonI18nReader, JsonI18nWriter};
 use pgl_fmt_pdf::{PdfReflowReader, PdfOverlayWriter};
 use pgl_fmt_convert::{ConverterRegistry, ConvertReader, ConvertWriter};
 use pgl_providers_openai::OpenAICompatProvider;
@@ -194,6 +194,8 @@ impl AppState {
         fmt_registry.register_writer(Arc::new(SrtWriter::new()));
         fmt_registry.register_reader(Arc::new(VttReader::new()));
         fmt_registry.register_writer(Arc::new(VttWriter::new()));
+        fmt_registry.register_reader(Arc::new(HtmlTextReader::new()));
+        fmt_registry.register_writer(Arc::new(HtmlTextWriter::new()));
         fmt_registry.register_reader(Arc::new(PoReader::new()));
         fmt_registry.register_writer(Arc::new(PoWriter::new()));
         fmt_registry.register_reader(Arc::new(XliffReader::new()));
