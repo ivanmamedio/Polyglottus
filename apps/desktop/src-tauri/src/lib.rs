@@ -5,7 +5,6 @@
 #![warn(clippy::all, clippy::pedantic, clippy::nursery, clippy::cargo)]
 
 use pgl_app::{ImportBook, PlanTranslation, ExecuteJob, ExportBook, EventSink, AppEvent, JobTranslationLookup, prelude::FormatRegistry, SecretStore, ProjectRepository, ModelCatalog};
-use pgl_storage::SqliteRepository;
 use pgl_domain::{Language, ExportOptions, OutputFormat, JobConfig, UnitId, UnitState, QaWarning};
 use pgl_fmt_epub::{EpubReader, EpubWriter};
 use pgl_fmt_ooxml::{DocxReader, DocxWriter, PptxReader, PptxWriter, XlsxReader, XlsxWriter};
@@ -379,7 +378,7 @@ async fn start_translation(
             Arc::new(p)
         }
         "ollama" => {
-            let mut p = OllamaProvider::new(pgl_providers_ollama::OllamaConfig {
+            let mut p = OllamaProvider::new(pgl_provider_ollama::OllamaConfig {
                 base_url: url.unwrap_or_else(|| "http://localhost:11434".into()),
                 ..Default::default()
             }).map_err(|e| e.to_string())?;
