@@ -21,7 +21,7 @@ members = [
     "crates/bins/pgl-cli",
     "crates/bins/pgl-engine",
     "crates/testing/pgl-testkit",
-    # "apps/desktop/src-tauri",
+    "apps/desktop/src-tauri",
 ]
 
 [workspace.dependencies]
