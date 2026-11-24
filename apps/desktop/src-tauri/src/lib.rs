@@ -44,6 +44,20 @@ pub struct ProjectSummary {
     pub overall_progress: u8,
 }
 
+impl From<pgl_app::Project> for ProjectSummary {
+    fn from(p: pgl_app::Project) -> Self {
+        Self {
+            id: p.id.to_string(),
+            name: p.name,
+            source_file: p.source_file.to_string_lossy().to_string(),
+            source_format: p.source_format,
+            created_at: p.created_at.to_string(),
+            updated_at: p.updated_at.to_string(),
+            overall_progress: p.overall_progress(),
+        }
+    }
+}
+
 #[derive(serde::Serialize, serde::Deserialize, Type, TS, Clone, Debug)]
 #[ts(export, export_to = "../ui/src/bindings/")]
 pub struct JobSummary {
@@ -547,19 +561,7 @@ async fn get_settings(state: State<'_, AppState>) -> Result<serde_json::Value, S
 // Conversões de tipos
 // ============================================================================
 
-impl From<pgl_app::ProjectSummary> for ProjectSummary {
-    fn from(p: pgl_app::ProjectSummary) -> Self {
-        Self {
-            id: p.id.to_string(),
-            name: p.name,
-            source_file: p.source_file,
-            source_format: p.source_format,
-            created_at: p.created_at,
-            updated_at: p.updated_at,
-            overall_progress: p.overall_progress,
-        }
-    }
-}
+
 
 impl From<pgl_app::JobSummary> for JobSummary {
     fn from(j: pgl_app::JobSummary) -> Self {
