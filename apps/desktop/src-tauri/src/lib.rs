@@ -607,7 +607,7 @@ async fn recommend_model(state: State<'_, AppState>, target_lang: String) -> Res
 #[tauri::command]
 async fn download_model(state: State<'_, AppState>, _window: Window, model_id: String) -> Result<(), String> {
     let cb: &dyn Fn(u64, u64) = &|_, _| {};
-    state.catalog.download_model(&model_id, cb).await.map_err(|e| e.to_string())
+    state.catalog.download_model(&model_id, cb).await.map(|_| ()).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
