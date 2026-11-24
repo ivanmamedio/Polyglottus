@@ -1,5 +1,13 @@
 <script lang="ts">
+  import { createEventDispatcher, onMount } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
+
+  const dispatch = createEventDispatcher();
+
+  let apiKeys: Record<string, string> = {};
+  let loading = false;
+  let saving = false;
+  let message: string | null = null;
 
   interface ModelInfo {
     id: string;
@@ -12,118 +20,150 @@
   }
 
   let models: ModelInfo[] = [];
-  let loading = true;
-  let activeTab = 'models';
+  let hardware: any = null;
 
-  async function loadModels() {
+  async function loadSettings() {
+    loading = true;
     try {
-      const result = await invoke<ModelInfo[]>('list_models');
-      models = result;
+      const settings = await invoke<any>('get_settings');
+      console.log('Settings:', settings);
     } catch (e) {
-      console.error('Failed to load models:', e);
+      console.error('Failed to load settings', e);
     } finally {
       loading = false;
     }
   }
 
-  async function downloadModel(id: string) {
+  async function loadModels() {
     try {
-      await invoke('download_model', { modelId: id });
-      await loadModels();
+      models = await invoke<ModelInfo[]>('list_models');
     } catch (e) {
-      alert('Erro ao baixar: ' + e);
+      console.error('Failed to load models', e);
     }
   }
 
-  async function removeModel(id: string) {
-    if (!confirm('Remover modelo ' + id + '?')) return;
+  async function loadHardware() {
     try {
-      await invoke('remove_model', { modelId: id });
-      await loadModels();
+      hardware = await invoke<any>('recommend_model', { target_lang: 'pt-BR' });
     } catch (e) {
-      alert('Erro ao remover: ' + e);
+      console.error('Failed to load hardware', e);
     }
   }
+
+  async function setApiKey(provider: string, key: string) {
+    saving = true;
+    try {
+      await invoke('set_api_key', { provider, key });
+      apiKeys[provider] = key;
+      message = `API key saved for ${provider}`;
+      setTimeout(() => message = null, 3000);
+    } catch (e) {
+      message = 'Failed to save API key';
+      setTimeout(() => message = null, 3000);
+      console.error(e);
+    } finally {
+      saving = false;
+    }
+  }
+
+  onMount(async () => {
+    await loadSettings();
+    await loadModels();
+    await loadHardware();
+  });
 </script>
 
 <div class="space-y-6">
-  <div class="flex items-center justify-between">
-    <h1 class="text-2xl font-bold text-surface-900 dark:text-surface-100">Modelos</h1>
-  </div>
+  <h1 class="text-xl font-bold text-gray-900">Settings</h1>
 
-  <div class="card">
-    <div class="p-4 border-b border-surface-200 dark:border-surface-700">
-      <div class="flex gap-4 border-b border-surface-200 dark:border-surface-700">
-        <button class={['pb-2 text-sm font-medium', activeTab === 'models' ? 'text-primary-600 border-b-2 border-primary-600' : 'text-surface-500']} onclick={() => activeTab = 'models'}>
-          Instalados
-        </button>
-        <button class={['pb-2 text-sm font-medium', activeTab === 'catalog' ? 'text-primary-600 border-b-2 border-primary-600' : 'text-surface-500']} onclick={() => activeTab = 'catalog'}>
-          Catálogo
-        </button>
-        <button class={['pb-2 text-sm font-medium', activeTab === 'hardware' ? 'text-primary-600 border-b-2 border-primary-600' : 'text-surface-500']} onclick={() => activeTab = 'hardware'}>
-          Hardware
-        </button>
-      </div>
+  {#if message}
+    <div class="p-4 bg-blue-50 border border-blue-200 rounded-md text-blue-800 text-sm">
+      {message}
     </div>
+  {/if}
 
-    {#if activeTab === 'models'}
-      <div class="p-4">
-        {#if loading}
-          <div class="flex items-center justify-center py-12">
-            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
-          </div>
-        {:else if models.length === 0}
-          <div class="text-center py-12">
-            <svg class="mx-auto h-16 w-16 text-surface-300 dark:text-surface-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
-            </svg>
-            <h3 class="mt-4 text-lg font-medium text-surface-900 dark:text-surface-100">Nenhum modelo instalado</h3>
-            <p class="mt-2 text-surface-500 dark:text-surface-400">Baixe um modelo na aba "Catálogo" ou use a recomendação automática</p>
-          </div>
-        {:else}
-          <div class="space-y-3">
-            {#each models as model}
-              <div class="flex items-center justify-between p-4 bg-surface-50 dark:bg-surface-800/50 rounded-lg">
-                <div class="flex-1 min-w-0">
-                  <p class="font-medium text-surface-900 dark:text-surface-100 truncate">{model.name}</p>
-                  <p class="text-sm text-surface-500 dark:text-surface-400">
-                    {model.size_gb ? model.size_gb.toFixed(1) + ' GB' : 'Tamanho desconhecido'} •
-                    {model.languages.join(', ')} •
-                    {model.max_context.toLocaleString()} tokens
-                  </p>
-                  {#if model.license}
-                    <span class="badge-info mt-1">{model.license}</span>
-                  {/if}
-                </div>
-                <button class="btn-danger ml-4" onclick={() => removeModel(model.id)}>
-                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
-                </button>
-              </div>
-            {/each}
-          </div>
-        {/if}
-      </div>
-    {:else if activeTab === 'catalog'}
-      <div class="p-4">
-        <p class="text-surface-500 dark:text-surface-400">Catálogo de modelos disponíveis para download (em desenvolvimento)</p>
-        <div class="mt-4 space-y-2">
-          <button class="btn-secondary w-full justify-start" onclick={() => invoke('recommend_model', { targetLang: 'pt-BR' }).then(loadModels)}>
-            Recomendar para Português (BR)
-          </button>
-          <button class="btn-secondary w-full justify-start" onclick={() => invoke('recommend_model', { targetLang: 'en' }).then(loadModels)}>
-            Recomendar para Inglês
-          </button>
-          <button class="btn-secondary w-full justify-start" onclick={() => invoke('recommend_model', { targetLang: 'es' }).then(loadModels)}>
-            Recomendar para Espanhol
+  <div class="border border-gray-200 rounded-lg p-6">
+    <h2 class="text-lg font-semibold text-gray-900 mb-6">API Keys</h2>
+    <div class="space-y-4">
+      {['openai', 'ollama', 'embedded'] as provider}
+      <div class="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+        <div>
+          <h3 class="text-sm font-medium text-gray-900 capitalize">{provider}</h3>
+          <p class="text-xs text-gray-500">API key for {provider} provider</p>
+        </div>
+        <div class="flex items-center gap-3">
+          <input
+            bind:value={apiKeys[provider] || ''}
+            type="password"
+            placeholder="Enter API key"
+            class="w-64 p-2 border border-gray-300 rounded-md text-sm"
+          />
+          <button
+            onclick={() => setApiKey(provider, apiKeys[provider] || '')}
+            disabled={saving}
+            class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50 transition text-sm"
+          >
+            Save
           </button>
         </div>
       </div>
-    {:else if activeTab === 'hardware'}
-      <div class="p-4">
-        <p class="text-surface-500 dark:text-surface-400">Detecção de hardware (em desenvolvimento)</p>
+      {/each}
+    </div>
+  </div>
+
+  <div class="border border-gray-200 rounded-lg p-6">
+    <h2 class="text-lg font-semibold text-gray-900 mb-6">Models</h2>
+    <div class="space-y-4">
+      {#if models.length === 0}
+        <p class="text-gray-500 text-sm">No models installed.</p>
+      {/else}
+        <table class="w-full text-left text-sm">
+          <thead>
+            <tr class="bg-gray-50">
+              <th class="px-4 py-3 font-medium text-gray-600">Model</th>
+              <th class="px-4 py-3 font-medium text-gray-600">Size</th>
+              <th class="px-4 py-3 font-medium text-gray-600">Local</th>
+              <th class="px-4 py-3 font-medium text-gray-600">License</th>
+            </tr>
+          </thead>
+          <tbody>
+            {#each models as model}
+              <tr class="border-b border-gray-100">
+                <td class="px-4 py-3">{model.name}</td>
+                <td class="px-4 py-3">{model.size_gb?.toFixed(1) ?? 'N/A'} GB</td>
+                <td class="px-4 py-3">{model.is_local ? 'Yes' : 'No'}</td>
+                <td class="px-4 py-3">{model.license ?? 'N/A'}</td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      {/if}
+    </div>
+  </div>
+
+  <div class="border border-gray-200 rounded-lg p-6">
+    <h2 class="text-lg font-semibold text-gray-900 mb-6">Hardware Profile</h2>
+    {#if hardware}
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+        <div class="p-4 bg-gray-50 rounded-lg">
+          <h4 class="text-xs font-semibold text-gray-500 uppercase mb-2">CPU Cores</h4>
+          <p class="text-gray-900">{hardware.hardware_profile?.cpu_cores ?? 'N/A'}</p>
+        </div>
+        <div class="p-4 bg-gray-50 rounded-lg">
+          <h4 class="text-xs font-semibold text-gray-500 uppercase mb-2">RAM</h4>
+          <p class="text-gray-900">{hardware.hardware_profile?.ram_gb?.toFixed(1) ?? 'N/A'} GB</p>
+        </div>
+        <div class="p-4 bg-gray-50 rounded-lg">
+          <h4 class="text-xs font-semibold text-gray-500 uppercase mb-2">Platform</h4>
+          <p class="text-gray-900">{hardware.hardware_profile?.platform ?? 'N/A'}</p>
+        </div>
+        <div class="p-4 bg-gray-50 rounded-lg">
+          <h4 class="text-xs font-semibold text-gray-500 uppercase mb-2">Arch</h4>
+          <p class="text-gray-900">{hardware.hardware_profile?.arch ?? 'N/A'}</p>
+        </div>
       </div>
+    {:else}
+      <p class="text-gray-500 text-sm">Hardware detection not available.</p>
     {/if}
   </div>
 </div>

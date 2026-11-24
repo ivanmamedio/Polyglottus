@@ -4,12 +4,13 @@
   import { listen } from '@tauri-apps/api/event';
   import ProjectList from './components/ProjectList.svelte';
   import ProjectDetail from './components/ProjectDetail.svelte';
+  import Import from './components/Import.svelte';
   import Settings from './components/Settings.svelte';
   import Header from './components/Header.svelte';
   import Sidebar from './components/Sidebar.svelte';
   import Toast from './components/Toast.svelte';
 
-  type View = 'list' | 'detail' | 'settings';
+  type View = 'list' | 'detail' | 'settings' | 'import';
 
   let currentView: View = 'list';
   let selectedProject: string | null = null;
@@ -60,6 +61,8 @@
         <ProjectDetail projectId={selectedProject} onBack={() => navigateTo('list')} />
       {:else if currentView === 'settings'}
         <Settings />
+      {:else if currentView === 'import'}
+        <Import onBack={() => navigateTo('list')} />
       {/if}
     </main>
   </div>

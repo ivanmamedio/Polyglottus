@@ -1,10 +1,12 @@
 <script lang="ts">
+  import { createEventDispatcher, onMount } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
-  import { onMount, onDestroy } from 'svelte';
   import { listen } from '@tauri-apps/api/event';
 
   export let projectId: string;
   export let onBack: () => void;
+
+  const dispatch = createEventDispatcher();
 
   interface JobSummary {
     id: string;
@@ -33,339 +35,327 @@
     kind: string;
     state: string;
     section: string;
-    qa_warnings: Array<{ code: string; message: string; severity: string }>;
+    qa_warnings: Array<{
+      code: string;
+      message: string;
+      severity: string;
+    }>;
   }
 
-  let jobs: JobSummary[] = [];
-  let selectedJob: JobSummary | null = null;
+  let job: JobSummary | null = null;
   let units: UnitDto[] = [];
-  let loading = true;
-  let translating = false;
-  let showTranslateModal = false;
-  let showExportModal = false;
+  let loading = false;
+  let error: string | null = null;
+  let selectedUnit: UnitDto | null = null;
 
-  let translateConfig = {
-    provider: 'ollama',
-    model: '',
-    url: '',
-    batchSize: 10,
-    maxParallel: 3,
-    targetLang: 'pt-BR',
-    outputFormat: 'same',
-    bilingual: false,
-  };
+  let provider = 'ollama';
+  let model = '';
+  let batchSize = 10;
+  let maxParallel = 3;
+  let targetLang = 'pt-BR';
 
-  let exportConfig = {
-    format: 'same',
-    bilingual: false,
-  };
-
-  let unsubscribeEvents: () => void;
-  let filterState = 'all';
-
-  $: filteredUnits = units.filter(u => filterState === 'all' || u.state === filterState);
-
-  async function loadJobs() {
+  async function loadProject() {
+    loading = true;
     try {
-      const result = await invoke<JobSummary[]>('list_jobs', { projectId });
-      jobs = result;
-      if (jobs.length > 0 && !selectedJob) {
-        selectedJob = jobs[0];
-        await loadUnits();
-      }
+      const proj = await invoke<any>('get_project', { id: projectId });
+      // Get active job
+      const jobs = await invoke<JobSummary[]>('list_jobs', { project_id: projectId });
+      job = jobs.find(j => j.state !== 'Completed' && j.state !== 'Cancelled') ?? jobs[0] ?? null;
     } catch (e) {
-      console.error('Failed to load jobs:', e);
+      error = 'Failed to load project';
+      console.error(e);
     } finally {
       loading = false;
     }
   }
 
   async function loadUnits() {
-    if (!selectedJob) return;
+    if (!job) return;
     try {
-      const states = ['Pending', 'Translated', 'Flagged', 'Reviewed', 'Failed'];
-      const result = await invoke<UnitDto[]>('get_units', {
-        jobId: selectedJob.id,
-        states,
+      units = await invoke<UnitDto[]>('get_units', {
+        job_id: job.id,
+        states: JSON.stringify(['Pending', 'Translated', 'Flagged', 'Reviewed']),
       });
-      units = result;
     } catch (e) {
-      console.error('Failed to load units:', e);
-    }
-  }
-
-  function formatTime(secs: number) {
-    if (secs < 60) return `${secs}s`;
-    if (secs < 3600) return `${Math.floor(secs / 60)}m ${secs % 60}s`;
-    return `${Math.floor(secs / 3600)}h ${Math.floor((secs % 3600) / 60)}m`;
-  }
-
-  function getStateColor(state: string) {
-    switch (state) {
-      case 'Running': return 'text-blue-600 bg-blue-100 dark:bg-blue-900/30';
-      case 'Paused': return 'text-yellow-600 bg-yellow-100 dark:bg-yellow-900/30';
-      case 'Completed': return 'text-green-600 bg-green-100 dark:bg-green-900/30';
-      case 'Failed': return 'text-red-600 bg-red-100 dark:bg-red-900/30';
-      case 'Cancelled': return 'text-surface-600 bg-surface-100 dark:bg-surface-800';
-      default: return 'text-surface-600 bg-surface-100 dark:bg-surface-800';
-    }
-  }
-
-  function getUnitStateColor(state: string) {
-    switch (state) {
-      case 'Pending': return 'text-surface-500';
-      case 'Translated': return 'text-blue-600';
-      case 'Flagged': return 'text-yellow-600';
-      case 'Reviewed': return 'text-green-600';
-      case 'Failed': return 'text-red-600';
-      default: return 'text-surface-500';
+      console.error('Failed to load units', e);
     }
   }
 
   async function startTranslation() {
-    if (!selectedJob) return;
-    translating = true;
-    showTranslateModal = false;
+    if (!job) return;
+    loading = true;
     try {
       await invoke('start_translation', {
-        jobId: selectedJob.id,
-        ...translateConfig,
+        job_id: job.id,
+        provider,
+        model: model || null,
+        batch_size: batchSize,
+        max_parallel: maxParallel,
       });
+      await loadProject();
     } catch (e) {
-      alert('Erro ao iniciar tradução: ' + e);
-      translating = false;
+      error = 'Failed to start translation';
+      console.error(e);
+    } finally {
+      loading = false;
     }
   }
 
   async function pauseTranslation() {
-    if (!selectedJob) return;
-    try {
-      await invoke('pause_translation', { jobId: selectedJob.id });
-    } catch (e) {
-      alert('Erro ao pausar: ' + e);
-    }
+    if (!job) return;
+    await invoke('pause_translation', { job_id: job.id });
+    await loadProject();
   }
 
   async function resumeTranslation() {
-    if (!selectedJob) return;
-    try {
-      await invoke('resume_translation', { jobId: selectedJob.id });
-    } catch (e) {
-      alert('Erro ao retomar: ' + e);
-    }
+    if (!job) return;
+    await invoke('resume_translation', { job_id: job.id });
+    await loadProject();
   }
 
   async function cancelTranslation() {
-    if (!selectedJob) return;
-    if (!confirm('Tem certeza que deseja cancelar? O progresso será salvo.')) return;
-    try {
-      await invoke('cancel_translation', { jobId: selectedJob.id });
-    } catch (e) {
-      alert('Erro ao cancelar: ' + e);
-    }
+    if (!job) return;
+    await invoke('cancel_translation', { job_id: job.id });
+    await loadProject();
   }
 
-  async function exportBook() {
-    if (!selectedJob) return;
-    showExportModal = false;
-    try {
-      const outputPath = await invoke<string>('export_book', {
-        jobId: selectedJob.id,
-        outputPath: '', // TODO: usar dialog para escolher
-        format: exportConfig.format,
-        bilingual: exportConfig.bilingual,
-      });
-      alert('Exportado para: ' + outputPath);
-    } catch (e) {
-      alert('Erro ao exportar: ' + e);
-    }
+  async function updateUnit(unitId: string, action: string, translation?: string) {
+    await invoke('update_unit', {
+      unit_id: unitId,
+      translation: translation || '',
+      action,
+    });
+    await loadUnits();
+    selectedUnit = null;
   }
 
-  async function editUnit(unit: UnitDto) {
-    // TODO: abrir modal de edição
-    alert('Editar: ' + unit.source_text.substring(0, 50));
+  function formatETA(secs: number | null): string {
+    if (!secs) return '--';
+    const h = Math.floor(secs / 3600);
+    const m = Math.floor((secs % 3600) / 60);
+    const s = secs % 60;
+    return h > 0 ? `${h}h ${m}m ${s}s` : `${m}m ${s}s`;
   }
 
-  async function retraduzeUnit(id: string) {
-    try {
-      await invoke('update_unit', { unitId: id, translation: '', action: 'retranslate' });
-      await loadUnits();
-    } catch (e) {
-      alert('Erro: ' + e);
+  function getStateColor(state: string): string {
+    switch (state) {
+      case 'Completed': return 'bg-green-100 text-green-800';
+      case 'Failed': return 'bg-red-100 text-red-800';
+      case 'Running': return 'bg-blue-100 text-blue-800';
+      case 'Paused': return 'bg-yellow-100 text-yellow-800';
+      case 'Created': return 'bg-gray-100 text-gray-800';
+      default: return 'bg-gray-100 text-gray-800';
     }
   }
 
   onMount(async () => {
-    await loadJobs();
+    await loadProject();
+    await loadUnits();
 
-    // Listen for real-time events
-    unsubscribeEvents = await listen('app-event', (event) => {
-      const payload = event.payload;
-      if (payload.type === 'JobProgress' && selectedJob?.id === payload.job_id) {
-        const jobIndex = jobs.findIndex(j => j.id === payload.job_id);
-        if (jobIndex >= 0) {
-          jobs[jobIndex].progress = payload.progress;
-          jobs = [...jobs];
-        }
+    listen('app-event', (event) => {
+      const payload: any = event.payload;
+      if (payload.type === 'JobProgress' || payload.type === 'JobCompleted' || payload.type === 'JobFailed') {
+        loadProject();
+        loadUnits();
       }
     });
-  });
-
-  onDestroy(() => {
-    if (unsubscribeEvents) unsubscribeEvents();
   });
 </script>
 
 <div class="space-y-6">
-  <!-- Header -->
   <div class="flex items-center justify-between">
-    <div class="flex items-center gap-4">
-      <button class="btn-ghost" onclick={onBack}>
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-        </svg>
-      </button>
-      <div>
-        <h1 class="text-2xl font-bold text-surface-900 dark:text-surface-100">Detalhes do Projeto</h1>
-        <p class="text-surface-500 dark:text-surface-400">Gerencie jobs de tradução</p>
-      </div>
-    </div>
-
-    <div class="flex items-center gap-2">
-      <button class="btn-primary" onclick={() => showTranslateModal = true} disabled={translating || !selectedJob?.progress.pending}>
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-        </svg>
-        Traduzir
-      </button>
-      <button class="btn-secondary" onclick={() => showExportModal = true} disabled={!selectedJob || selectedJob.state !== 'Completed'}>
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-        </svg>
-        Exportar
-      </button>
-    </div>
+    <button onclick={onBack} class="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+      </svg>
+      Back
+    </button>
+    <h1 class="text-xl font-bold text-gray-900">Project Details</h1>
   </div>
 
   {#if loading}
-    <div class="flex items-center justify-center py-12">
-      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
-    </div>
-  {:else}
-    <!-- Jobs List -->
-    <div class="card">
-      <div class="p-4 border-b border-surface-200 dark:border-surface-700">
-        <h2 class="text-lg font-semibold">Jobs de Tradução</h2>
-      </div>
-      <div class="divide-y divide-surface-200 dark:divide-surface-700">
-        {#each jobs as job}
-          <div class="p-4 hover:bg-surface-50 dark:hover:bg-surface-800/50 transition-colors" class:selected={selectedJob?.id === job.id} onclick={() => { selectedJob = job; loadUnits(); }}>
-            <div class="flex items-center justify-between">
-              <div class="flex items-center gap-4">
-                <span class="px-3 py-1 rounded-full text-sm font-medium {getStateColor(job.state)}">{job.state}</span>
-                <div>
-                  <p class="font-medium text-surface-900 dark:text-surface-100">Para {job.target_language}</p>
-                  <p class="text-sm text-surface-500 dark:text-surface-400">Criado em {new Date(job.created_at).toLocaleDateString('pt-BR')}</p>
-                </div>
-              </div>
-              <div class="flex items-center gap-4">
-                <div class="w-32 h-2 bg-surface-200 dark:bg-surface-700 rounded-full overflow-hidden">
-                  <div class="h-full bg-primary-600 rounded-full transition-all duration-300" style="width: {job.progress.percent}%"></div>
-                </div>
-                <span class="text-sm font-medium text-surface-700 dark:text-surface-300 w-16 text-right">{job.progress.percent}%</span>
-              </div>
+    <div class="py-8 text-center text-gray-500">Loading...</div>
+  {:else if error}
+    <div class="p-4 bg-red-50 border border-red-200 rounded-md text-red-800 text-sm">{error}</div>
+  {:else if job}
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div class="col-span-1 md:col-span-2">
+        <!-- Job Status -->
+        <div class="border border-gray-200 rounded-lg p-6 mb-6">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h2 class="text-lg font-semibold text-gray-900">Translation Job</h2>
+              <p class="text-sm text-gray-500">Target: {job.target_language}</p>
             </div>
-            <div class="mt-2 flex items-center gap-4 text-sm text-surface-500 dark:text-surface-400">
-              <span>{job.progress.completed}/{job.progress.total} unidades</span>
-              {#if job.progress.eta_secs !== null}
-                <span>ETA: {formatTime(job.progress.eta_secs)}</span>
-              {/if}
-              <span>{job.progress.units_per_second.toFixed(1)} un/s</span>
-            </div>
-            {#if job.state === 'Running'}
-              <div class="mt-2 flex gap-2">
-                <button class="btn-ghost text-sm" onclick={pauseTranslation}>Pausar</button>
-                <button class="btn-ghost text-sm text-red-600" onclick={cancelTranslation}>Cancelar</button>
-              </div>
-            {:else if job.state === 'Paused'}
-              <div class="mt-2 flex gap-2">
-                <button class="btn-primary text-sm" onclick={resumeTranslation}>Retomar</button>
-                <button class="btn-ghost text-sm text-red-600" onclick={cancelTranslation}>Cancelar</button>
-              </div>
-            {/if}
+            <span class={getStateColor(job.state)} class="px-3 py-1 rounded-full text-xs font-semibold uppercase">
+              {job.state}
+            </span>
           </div>
-        {/each}
-      </div>
-    </div>
 
-    {#if selectedJob}
-      <!-- Units Table -->
-      <div class="card">
-        <div class="p-4 border-b border-surface-200 dark:border-surface-700 flex items-center justify-between">
-          <h2 class="text-lg font-semibold">Unidades ({units.length})</h2>
-          <div class="flex gap-2">
-            <select class="input w-auto" bind:value={filterState} on:change={loadUnits}>
-              <option value="all">Todas</option>
-              <option value="Pending">Pendentes</option>
-              <option value="Translated">Traduzidas</option>
-              <option value="Flagged">Com aviso</option>
-              <option value="Reviewed">Revisadas</option>
-              <option value="Failed">Falhas</option>
-            </select>
+          <div class="space-y-3">
+            <div class="flex justify-between text-sm">
+              <span class="text-gray-600">Progress</span>
+              <span class="font-medium">{job.progress.percent}%</span>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-3">
+              <div class="bg-indigo-600 h-3 rounded-full" style="width: {job.progress.percent}%"></div>
+            </div>
+            <div class="flex justify-between text-xs text-gray-500">
+              <span>{job.progress.completed} / {job.progress.total} units</span>
+              <span>{job.progress.flagged} flagged</span>
+              <span>{job.progress.failed} failed</span>
+            </div>
+            <div class="flex justify-between text-sm text-gray-500">
+              <span>ETA: {formatETA(job.progress.eta_secs)}</span>
+              <span>{job.progress.units_per_second.toFixed(1)} units/sec</span>
+            </div>
+          </div>
+
+          <!-- Translation Controls -->
+          <div class="mt-6 pt-6 border-t border-gray-200">
+            <h3 class="text-sm font-semibold text-gray-900 mb-4">Start Translation</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">Provider</label>
+                <select bind:value={provider} class="w-full p-2 border border-gray-300 rounded-md text-sm">
+                  <option value="ollama">Ollama (local)</option>
+                  <option value="openai">OpenAI-compatible</option>
+                  <option value="embedded">Embedded (llama.cpp)</option>
+                  <option value="fake">Fake (testing)</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">Target Language</label>
+                <select bind:value={targetLang} class="w-full p-2 border border-gray-300 rounded-md text-sm">
+                  <option value="pt-BR">Portuguese (Brazil)</option>
+                  <option value="es">Spanish</option>
+                  <option value="fr">French</option>
+                  <option value="de">German</option>
+                  <option value="en">English</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">Model</label>
+                <input bind:value={model} type="text" placeholder="e.g., llama3" class="w-full p-2 border border-gray-300 rounded-md text-sm" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">Batch Size</label>
+                <input bind:value={batchSize} type="number" value="10" class="w-full p-2 border border-gray-300 rounded-md text-sm" />
+              </div>
+            </div>
+            <div class="mt-4">
+              {#if job.state === 'Running'}
+                <button onclick={pauseTranslation} class="px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition">
+                  Pause
+                </button>
+                <button onclick={cancelTranslation} class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition ml-2">
+                  Cancel
+                </button>
+              {:else if job.state === 'Paused'}
+                <button onclick={resumeTranslation} class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition">
+                  Resume
+                </button>
+                <button onclick={cancelTranslation} class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition ml-2">
+                  Cancel
+                </button>
+              {:else}
+                <button onclick={startTranslation} class="px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition font-medium">
+                  Start Translation
+                </button>
+              {/if}
+            </div>
           </div>
         </div>
-        <div class="overflow-x-auto">
-          <table class="w-full">
-            <thead>
-              <tr class="text-left text-sm text-surface-500 dark:text-surface-400 border-b border-surface-200 dark:border-surface-700">
-                <th class="pb-2 pr-4 w-8"></th>
-                <th class="pb-2 pr-4">Tipo</th>
-                <th class="pb-2 pr-4">Original</th>
-                <th class="pb-2 pr-4">Tradução</th>
-                <th class="pb-2 pr-4">Estado</th>
-                <th class="pb-2 pr-4">QA</th>
-                <th class="pb-2 pr-4 w-24">Ações</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-surface-200 dark:divide-surface-700">
-              {#each filteredUnits as unit}
-                <tr class="hover:bg-surface-50 dark:hover:bg-surface-800/50">
-                  <td class="py-3 pr-4">
-                    <input type="checkbox" disabled checked={unit.state !== 'Pending'} />
-                  </td>
-                  <td class="py-3 pr-4 text-sm text-surface-600 dark:text-surface-400">{unit.kind}</td>
-                  <td class="py-3 pr-4 max-w-xs truncate text-surface-900 dark:text-surface-100" title={unit.source_text}>{unit.source_text}</td>
-                  <td class="py-3 pr-4 max-w-xs truncate text-surface-700 dark:text-surface-300" title={unit.translated_text || ''}>{unit.translated_text || '—'}</td>
-                  <td class="py-3 pr-4">
-                    <span class="px-2 py-0.5 rounded text-xs font-medium" style="color: {getUnitStateColor(unit.state)}; background: {getUnitStateColor(unit.state)}20;">
-                      {unit.state}
-                    </span>
-                  </td>
-                  <td class="py-3 pr-4">
-                    {#if unit.qa_warnings.length > 0}
-                      <span class="badge-warning">{unit.qa_warnings.length} aviso(s)</span>
-                    {:else}
-                      <span class="text-surface-400 dark:text-surface-500">—</span>
-                    {/if}
-                  </td>
-                  <td class="py-3 pr-4">
-                    <div class="flex items-center gap-1">
-                      {#if unit.state === 'Flagged' || unit.state === 'Failed'}
-                        <button class="btn-ghost p-1.5" title="Editar/Revisar" onclick={() => editUnit(unit)}>
-                          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                        </button>
-                        <button class="btn-ghost p-1.5 text-blue-600" title="Retraduzir" onclick={() => retraduzeUnit(unit.id)}>
-                          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                        </button>
-                      {/if}
-                    </div>
-                  </td>
+
+        <!-- Units List -->
+        <div class="border border-gray-200 rounded-lg">
+          <div class="p-4 border-b border-gray-200">
+            <h2 class="text-lg font-semibold text-gray-900">Units ({units.length})</h2>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-4 py-3 font-medium text-gray-600">Source</th>
+                  <th class="px-4 py-3 font-medium text-gray-600">Translation</th>
+                  <th class="px-4 py-3 font-medium text-gray-600">State</th>
+                  <th class="px-4 py-3 font-medium text-gray-600">Actions</th>
                 </tr>
-              {/each}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {#each units as unit}
+                  <tr class="border-b border-gray-100 hover:bg-gray-50">
+                    <td class="px-4 py-3 text-gray-700 max-w-xs truncate">{unit.source_text}</td>
+                    <td class="px-4 py-3 {unit.translated_text ? 'text-green-700' : 'text-gray-400 italic'}" max-w-xs truncate>
+                      {unit.translated_text ?? '—'}
+                    </td>
+                    <td class="px-4 py-3">
+                      <span class={getStateColor(unit.state)} class="px-2 py-0.5 rounded text-xs font-semibold">
+                        {unit.state}
+                      </span>
+                    </td>
+                    <td class="px-4 py-3">
+                      {#if unit.translated_text && unit.state === 'Translated'}
+                        <button onclick={() => updateUnit(unit.id, 'approve')} class="text-xs text-green-600 hover:text-green-800 mr-2">Approve</button>
+                      {/if}
+                      <button onclick={() => { selectedUnit = unit; }} class="text-xs text-indigo-600 hover:text-indigo-800 mr-2">Edit</button>
+                      <button onclick={() => updateUnit(unit.id, 'retranslate')} class="text-xs text-orange-600 hover:text-orange-800">Retranslate</button>
+                    </td>
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
-    {/if}
+
+      <div class="col-span-1 md:col-span-1 space-y-6">
+        <!-- Export -->
+        <div class="border border-gray-200 rounded-lg p-6">
+          <h3 class="text-sm font-semibold text-gray-900 mb-4">Export</h3>
+          <div class="space-y-3">
+            <select class="w-full p-2 border border-gray-300 rounded-md text-sm">
+              <option value="epub">EPUB</option>
+              <option value="docx">DOCX</option>
+              <option value="txt">TXT</option>
+              <option value="md">Markdown</option>
+            </select>
+            <label class="flex items-center gap-2 text-sm">
+              <input type="checkbox" /> Bilingual
+            </label>
+            <button class="w-full px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition">
+              Export
+            </button>
+          </div>
+        </div>
+
+        <!-- Unit Editor -->
+        {#if selectedUnit}
+          <div class="border border-gray-200 rounded-lg p-6 bg-gray-50">
+            <h3 class="text-sm font-semibold text-gray-900 mb-4">Edit Unit</h3>
+            <div class="space-y-4">
+              <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">Source</label>
+                <div class="p-3 bg-white border border-gray-300 rounded text-sm text-gray-700">
+                  {selectedUnit.source_text}
+                </div>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">Translation</label>
+                <textarea bind:value={selectedUnit.translated_text} rows="4" class="w-full p-3 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-indigo-500" />
+              </div>
+              <div class="flex gap-2">
+                <button onclick={() => updateUnit(selectedUnit.id, 'edit', selectedUnit.translated_text || '')} class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition">
+                  Save
+                </button>
+                <button onclick={() => selectedUnit = null} class="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        {/if}
+      </div>
+    </div>
   {/if}
 </div>
