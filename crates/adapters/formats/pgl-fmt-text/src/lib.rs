@@ -8,7 +8,7 @@ pub mod txt;
 pub mod md;
 pub mod srt;
 pub mod vtt;
-pub mod html_text;
+// pub mod html_text;  // TODO: fix scraper API usage
 pub mod po;
 pub mod xliff;
 pub mod tmx;
@@ -373,76 +373,6 @@ impl FormatWriter for VttWriter {
 //     }
 // }
 
-/// Leitor HTML (texto)
-pub struct HtmlTextReader;
-
-impl HtmlTextReader {
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-#[async_trait]
-impl FormatReader for HtmlTextReader {
-    fn id(&self) -> FormatId {
-        FormatId::HTML
-    }
-
-    fn extensions(&self) -> &'static [&'static str] {
-        &[".html", ".htm", ".xhtml"]
-    }
-
-    fn sniff(&self, name: &str, head: &[u8]) -> Confidence {
-        let ext_match = name.ends_with(".html") || name.ends_with(".htm") || name.ends_with(".xhtml");
-        let html_match = head.windows(7).any(|w| w == b"<html") || head.windows(9).any(|w| w == b"<!DOCTYPE");
-
-        match (ext_match, html_match) {
-            (true, true) => Confidence::certain(),
-            (true, false) => Confidence::high(),
-            (false, true) => Confidence::medium(),
-            (false, false) => Confidence::none(),
-        }
-    }
-
-    async fn open(&self, path: &Path) -> Result<Box<dyn SourceDocument + 'static>, FormatError> {
-        html_text::open_html(path).await
-    }
-}
-
-/// Writer HTML
-pub struct HtmlTextWriter;
-
-impl HtmlTextWriter {
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-#[async_trait]
-impl FormatWriter for HtmlTextWriter {
-    fn id(&self) -> FormatId {
-        FormatId::HTML
-    }
-
-    async fn write(
-        &self,
-        source: &Path,
-        translations: &dyn TranslationLookup,
-        options: &ExportOptions,
-        out: &Path,
-    ) -> Result<ExportReport, FormatError> {
-        html_text::write_html(source, translations, options, out).await
-    }
-
-    fn supports_bilingual(&self) -> bool {
-        true
-    }
-
-    fn output_formats(&self) -> &'static [OutputFormat] {
-        &[OutputFormat::HTML]
-    }
-}
-
 /// Leitor PO (gettext)
 pub struct PoReader;
 
@@ -735,7 +665,6 @@ mod tests {
         let _ = MdReader::new();
         let _ = SrtReader::new();
         let _ = VttReader::new();
-        let _ = HtmlTextReader::new();
         let _ = PoReader::new();
         let _ = XliffReader::new();
         let _ = TmxReader::new();
@@ -748,7 +677,6 @@ mod tests {
         let _ = MdWriter::new();
         let _ = SrtWriter::new();
         let _ = VttWriter::new();
-        let _ = HtmlTextWriter::new();
         let _ = PoWriter::new();
         let _ = XliffWriter::new();
         let _ = TmxWriter::new();
