@@ -76,7 +76,7 @@ impl From<pgl_app::Project> for ProjectSummary {
     fn from(p: pgl_app::Project) -> Self {
         Self {
             id: p.id.to_string(),
-            name: p.name,
+            name: p.name.clone(),
             source_file: p.source_file.to_string_lossy().to_string(),
             source_format: p.source_format.clone(),
             created_at: p.created_at.duration_since(std::time::UNIX_EPOCH).unwrap().as_secs().to_string(),
