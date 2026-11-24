@@ -528,7 +528,7 @@ async fn update_unit(
         _ => return Err("Invalid action".into()),
     }
 
-    state.repo.save_unit(&unit).await.map_err(|e| e.to_string())
+    state.repo.save_unit(&unit, &unit.job_id).await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
