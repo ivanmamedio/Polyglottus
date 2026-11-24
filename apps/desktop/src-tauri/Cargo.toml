@@ -23,7 +23,7 @@ pgl-fmt-odf = { workspace = true }
 pgl-fmt-convert = { workspace = true }
 pgl-provider-openai = { workspace = true }
 pgl-provider-ollama = { workspace = true }
-pgl-provider-embedded = { workspace = true }
+# pgl-provider-embedded = { workspace = true }  # Disabled: needs llama-cpp-sys-2 build tools
 pgl-ocr = { workspace = true }
 pgl-storage = { workspace = true }
 pgl-secrets = { workspace = true }
