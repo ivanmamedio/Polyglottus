@@ -51,8 +51,8 @@ impl From<pgl_app::Project> for ProjectSummary {
             name: p.name,
             source_file: p.source_file.to_string_lossy().to_string(),
             source_format: p.source_format,
-            created_at: p.created_at.to_string(),
-            updated_at: p.updated_at.to_string(),
+            created_at: p.created_at.duration_since(std::time::UNIX_EPOCH).unwrap().as_secs().to_string(),
+            updated_at: p.updated_at.duration_since(std::time::UNIX_EPOCH).unwrap().as_secs().to_string(),
             overall_progress: p.overall_progress(),
         }
     }
@@ -480,8 +480,28 @@ async fn export_book(
         ..Default::default()
     };
 
+    let target_format_id = match export_options.output_format {
+        pgl_domain::OutputFormat::EPUB => pgl_app::FormatId::EPUB,
+        pgl_domain::OutputFormat::DOCX => pgl_app::FormatId::DOCX,
+        pgl_domain::OutputFormat::PPTX => pgl_app::FormatId::PPTX,
+        pgl_domain::OutputFormat::XLSX => pgl_app::FormatId::XLSX,
+        pgl_domain::OutputFormat::ODT => pgl_app::FormatId::ODT,
+        pgl_domain::OutputFormat::ODP => pgl_app::FormatId::ODP,
+        pgl_domain::OutputFormat::ODS => pgl_app::FormatId::ODS,
+        pgl_domain::OutputFormat::HTML => pgl_app::FormatId::HTML,
+        pgl_domain::OutputFormat::TXT => pgl_app::FormatId::TXT,
+        pgl_domain::OutputFormat::MD => pgl_app::FormatId::MD,
+        pgl_domain::OutputFormat::PDF => pgl_app::FormatId::PDF,
+        pgl_domain::OutputFormat::SRT => pgl_app::FormatId::SRT,
+        pgl_domain::OutputFormat::VTT => pgl_app::FormatId::VTT,
+        pgl_domain::OutputFormat::XLIFF => pgl_app::FormatId::XLIFF,
+        pgl_domain::OutputFormat::TMX => pgl_app::FormatId::TMX,
+        pgl_domain::OutputFormat::PO => pgl_app::FormatId::PO,
+        pgl_domain::OutputFormat::JSON_I18N => pgl_app::FormatId::JSON_I18N,
+        pgl_domain::OutputFormat::SameAsSource => pgl_app::FormatId("any"),
+    };
     let writer = state.fmt_registry.writers().iter()
-        .find(|w| w.id() == export_options.output_format.into() || w.id() == pgl_app::FormatId("any"))
+        .find(|w| w.id() == target_format_id || w.id() == pgl_app::FormatId("any"))
         .ok_or("No writer for format")?;
 
     // Carrega unidades traduzidas do banco para o lookup de exportação
@@ -588,7 +608,7 @@ async fn remove_api_key(state: State<'_, AppState>, provider: String) -> Result<
 #[tauri::command]
 async fn get_settings(state: State<'_, AppState>) -> Result<serde_json::Value, String> {
     Ok(serde_json::json!({
-        "data_dir": state.repo.pool().connect_options().get_filename().unwrap_or_default(),
+        "data_dir": "data",
     }))
 }
 
