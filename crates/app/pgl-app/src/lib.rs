@@ -591,7 +591,7 @@ pub struct ImportBook {
 }
 
 impl ImportBook {
-    pub fn new(readers: Vec<Arc<dyn FormatReader>>, repo: Arc<dyn ProjectRepository>) -> Self {
+    pub fn new(readers: Vec<Arc<dyn FormatReader + Send + Sync>>, repo: Arc<dyn ProjectRepository>) -> Self {
         Self { readers, repo }
     }
 
