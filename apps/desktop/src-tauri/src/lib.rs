@@ -5,6 +5,7 @@
 #![warn(clippy::all, clippy::pedantic, clippy::nursery, clippy::cargo)]
 
 use pgl_app::{ImportBook, PlanTranslation, ExecuteJob, ExportBook, EventSink, AppEvent, JobTranslationLookup, prelude::FormatRegistry, SecretStore, ProjectRepository, ModelCatalog};
+use pgl_storage::SqliteRepository;
 use pgl_domain::{Language, ExportOptions, OutputFormat, JobConfig, UnitId, UnitState, QaWarning};
 use pgl_fmt_epub::{EpubReader, EpubWriter};
 use pgl_fmt_ooxml::{DocxReader, DocxWriter, PptxReader, PptxWriter, XlsxReader, XlsxWriter};
@@ -338,7 +339,8 @@ async fn plan_translation(
         project.active_job().map(|j| j.id).ok_or("No active job")?
     };
 
-    let job = state.repo.load_job(&jid).await.map_err(|e| e.to_string())?
+    let job = SqliteRepository::load_job(state.repo.as_ref(), &jid).await
+        .map_err(|e| e.to_string())?
         .ok_or("Job not found")?;
 
     let catalog = state.catalog.clone();
@@ -360,7 +362,8 @@ async fn start_translation(
     max_parallel: Option<usize>,
 ) -> Result<(), String> {
     let jid = uuid::Uuid::parse_str(&job_id).map_err(|e| e.to_string())?;
-    let mut job = state.repo.load_job(&jid).await.map_err(|e| e.to_string())?
+    let mut job = SqliteRepository::load_job(state.repo.as_ref(), &jid).await
+        .map_err(|e| e.to_string())?
         .ok_or("Job not found")?;
 
     if let Some(bs) = batch_size { job.config.batch_size = bs; }
@@ -411,7 +414,9 @@ async fn start_translation(
 #[tauri::command]
 async fn pause_translation(state: State<'_, AppState>, job_id: String) -> Result<(), String> {
     let jid = uuid::Uuid::parse_str(&job_id).map_err(|e| e.to_string())?;
-    let mut job = state.repo.load_job(&jid).await.map_err(|e| e.to_string())?.ok_or("Job not found")?;
+    let mut job = SqliteRepository::load_job(state.repo.as_ref(), &jid).await
+        .map_err(|e| e.to_string())?
+        .ok_or("Job not found")?;
     job.pause();
     state.repo.save_job(&job, &job.project_id).await.map_err(|e| e.to_string())
 }
@@ -419,7 +424,9 @@ async fn pause_translation(state: State<'_, AppState>, job_id: String) -> Result
 #[tauri::command]
 async fn resume_translation(state: State<'_, AppState>, job_id: String) -> Result<(), String> {
     let jid = uuid::Uuid::parse_str(&job_id).map_err(|e| e.to_string())?;
-    let mut job = state.repo.load_job(&jid).await.map_err(|e| e.to_string())?.ok_or("Job not found")?;
+    let mut job = SqliteRepository::load_job(state.repo.as_ref(), &jid).await
+        .map_err(|e| e.to_string())?
+        .ok_or("Job not found")?;
     job.resume();
     state.repo.save_job(&job, &job.project_id).await.map_err(|e| e.to_string())
 }
@@ -427,7 +434,9 @@ async fn resume_translation(state: State<'_, AppState>, job_id: String) -> Resul
 #[tauri::command]
 async fn cancel_translation(state: State<'_, AppState>, job_id: String) -> Result<(), String> {
     let jid = uuid::Uuid::parse_str(&job_id).map_err(|e| e.to_string())?;
-    let mut job = state.repo.load_job(&jid).await.map_err(|e| e.to_string())?.ok_or("Job not found")?;
+    let mut job = SqliteRepository::load_job(state.repo.as_ref(), &jid).await
+        .map_err(|e| e.to_string())?
+        .ok_or("Job not found")?;
     job.cancel();
     state.repo.save_job(&job, &job.project_id).await.map_err(|e| e.to_string())
 }
@@ -441,7 +450,9 @@ async fn export_book(
     bilingual: bool,
 ) -> Result<pgl_domain::ExportReport, String> {
     let jid = uuid::Uuid::parse_str(&job_id).map_err(|e| e.to_string())?;
-    let job = state.repo.load_job(&jid).await.map_err(|e| e.to_string())?.ok_or("Job not found")?;
+    let job = SqliteRepository::load_job(state.repo.as_ref(), &jid).await
+        .map_err(|e| e.to_string())?
+        .ok_or("Job not found")?;
 
     // Busca o project para obter o source_file (caminho do arquivo original)
     let project = state.repo.find_project_for_job(&jid).await.map_err(|e| e.to_string())?
