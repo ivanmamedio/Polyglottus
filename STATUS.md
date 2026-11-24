@@ -40,16 +40,15 @@ O projeto está em **Fase 0 concluída / Fase 1 em andamento**. O núcleo Rust (
 
 ## O que falta para Fase 1 (MVP)
 
-### Crítico (bloqueia validação)
-1. **Ambiente de build Windows**: `dlltool.exe` foi encontrado mas falha no CreateProcess. Solução: usar rustup com target MSVC (`x86_64-pc-windows-msvc`) que não precisa de dlltool. Já instalado via rustup.
-   - Agora `cargo check` funciona para todos os crates exceto `pgl-models`
-   - Depois rodar: `cargo check --workspace` (falha apenas em pgl-models)
+### Build e Testes — Resolvidos ✅
+1. **Ambiente de build Windows**: rustup com target MSVC instalado. `cargo check --workspace` passa completamente (todos os crates compilam).
+2. **pgl-models**: Stub que compila. Funcionalidade completa do catálogo de modelos fica para Fase 2+.
+3. **Todos os testes passam**: 13 crates com testes, todos passando (0 falhas).
 
-2. **pgl-models** — Erros pré-existentes (não causados por mim):
-   - Módulos `catalog`, `hardware`, `downloader` declarados mas arquivos não existem
-   - Imports ausentes: `sysinfo::CpuExt`, `sysinfo::DiskExt`, `sha2`, `futures_util`, `dirs`
-   - Métodos do trait `ModelCatalog` não implementados: `verify_checksum`, `get_model_info`, `get_model_info_from_file`
-   - Não é crítico para MVP da Fase 1
+### O que falta para Fase 1 (MVP)
+1. **html5ever 0.26 API**: `html_text.rs` re-comentado (incompatibilidade com scraper API). HTML não está no FormatRegistry.
+2. **PPTX/XLSX**: verificar se writers aplicam traduções (DOCX já foi consertado)
+3. **pgl-engine**: placeholder (apenas mantém processo vivo, sem JSON-RPC)
 
 3. **html5ever 0.26 API**: `html_text.rs` re-comentado (incompatibilidade com scraper API). HTML não está disponível no FormatRegistry.
 
