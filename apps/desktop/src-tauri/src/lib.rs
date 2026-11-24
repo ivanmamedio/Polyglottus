@@ -390,7 +390,7 @@ async fn start_translation(
     };
 
     // Atualiza job
-    state.repo.save_job(&job).await.map_err(|e| e.to_string())?;
+    state.repo.save_job(&job, &job.project_id).await.map_err(|e| e.to_string())?;
 
     // Executa em background
     let repo = state.repo.clone();
@@ -413,7 +413,7 @@ async fn pause_translation(state: State<'_, AppState>, job_id: String) -> Result
     let jid = uuid::Uuid::parse_str(&job_id).map_err(|e| e.to_string())?;
     let mut job = state.repo.load_job(&jid).await.map_err(|e| e.to_string())?.ok_or("Job not found")?;
     job.pause();
-    state.repo.save_job(&job).await.map_err(|e| e.to_string())
+    state.repo.save_job(&job, &job.project_id).await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -421,7 +421,7 @@ async fn resume_translation(state: State<'_, AppState>, job_id: String) -> Resul
     let jid = uuid::Uuid::parse_str(&job_id).map_err(|e| e.to_string())?;
     let mut job = state.repo.load_job(&jid).await.map_err(|e| e.to_string())?.ok_or("Job not found")?;
     job.resume();
-    state.repo.save_job(&job).await.map_err(|e| e.to_string())
+    state.repo.save_job(&job, &job.project_id).await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -429,7 +429,7 @@ async fn cancel_translation(state: State<'_, AppState>, job_id: String) -> Resul
     let jid = uuid::Uuid::parse_str(&job_id).map_err(|e| e.to_string())?;
     let mut job = state.repo.load_job(&jid).await.map_err(|e| e.to_string())?.ok_or("Job not found")?;
     job.cancel();
-    state.repo.save_job(&job).await.map_err(|e| e.to_string())
+    state.repo.save_job(&job, &job.project_id).await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
