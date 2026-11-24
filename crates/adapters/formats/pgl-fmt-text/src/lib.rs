@@ -8,7 +8,7 @@ pub mod txt;
 pub mod md;
 pub mod srt;
 pub mod vtt;
-// pub mod html_text;  // Desabilitado temporariamente - html5ever 0.26 API mudou
+pub mod html_text;  // TODO: adaptar para html5ever 0.26 API (parse_document signature changed)
 pub mod po;
 pub mod xliff;
 pub mod tmx;
@@ -302,7 +302,7 @@ impl FormatWriter for VttWriter {
     }
 }
 
-// HTML (texto) - temporariamente desabilitado - html5ever 0.26 API mudou
+// HTML (texto) - TODO: adaptar para html5ever 0.26 API (parse_document signature changed)
 // /// Leitor HTML (texto)
 // pub struct HtmlTextReader;
 // 
@@ -325,7 +325,7 @@ impl FormatWriter for VttWriter {
 //     fn sniff(&self, name: &str, head: &[u8]) -> Confidence {
 //         let ext_match = name.ends_with(".html") || name.ends_with(".htm") || name.ends_with(".xhtml");
 //         let html_match = head.windows(7).any(|w| w == b"<html") || head.windows(9).any(|w| w == b"<!DOCTYPE");
-// 
+//
 //         match (ext_match, html_match) {
 //             (true, true) => Confidence::certain(),
 //             (true, false) => Confidence::high(),
@@ -665,7 +665,7 @@ mod tests {
         let _ = MdReader::new();
         let _ = SrtReader::new();
         let _ = VttReader::new();
-        // let _ = HtmlTextReader::new();  // HTML temporarily disabled
+        // let _ = HtmlTextReader::new();  // TODO: enable when html5ever 0.26 API is adapted
         let _ = PoReader::new();
         let _ = XliffReader::new();
         let _ = TmxReader::new();
