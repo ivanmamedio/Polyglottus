@@ -58,6 +58,20 @@ impl From<pgl_app::Project> for ProjectSummary {
     }
 }
 
+impl From<pgl_app::ProjectSummary> for ProjectSummary {
+    fn from(p: pgl_app::ProjectSummary) -> Self {
+        Self {
+            id: p.id.to_string(),
+            name: p.name,
+            source_file: p.source_file,
+            source_format: p.source_format,
+            created_at: p.created_at,
+            updated_at: p.updated_at,
+            overall_progress: p.overall_progress,
+        }
+    }
+}
+
 #[derive(serde::Serialize, serde::Deserialize, Type, TS, Clone, Debug)]
 #[ts(export, export_to = "../ui/src/bindings/")]
 pub struct JobSummary {
