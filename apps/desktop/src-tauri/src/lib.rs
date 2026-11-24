@@ -528,7 +528,8 @@ async fn update_unit(
         _ => return Err("Invalid action".into()),
     }
 
-    state.repo.save_unit(&unit, &unit.job_id).await.map_err(|e| e.to_string())
+    SqliteRepository::save_unit(state.repo.as_ref(), &unit, &unit.job_id).await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
