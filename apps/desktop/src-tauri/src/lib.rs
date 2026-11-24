@@ -485,7 +485,8 @@ async fn export_book(
         pgl_domain::UnitState::Failed,
         pgl_domain::UnitState::Skipped,
     ];
-    let units = state.repo.load_units(&jid, &all_states).await.map_err(|e| e.to_string())?;
+    let units = ProjectRepository::load_units(state.repo.as_ref(), &jid, &all_states).await
+        .map_err(|e| e.to_string())?;
     let mut job_with_units = job;
     for unit in units {
         job_with_units.units.insert(unit.id, unit);
@@ -500,7 +501,8 @@ async fn export_book(
 async fn get_units(state: State<'_, AppState>, job_id: String, states: Vec<String>) -> Result<Vec<UnitDto>, String> {
     let jid = uuid::Uuid::parse_str(&job_id).map_err(|e| e.to_string())?;
     let unit_states: Vec<UnitState> = states.iter().filter_map(|s| serde_json::from_str(s).ok()).collect();
-    let units = state.repo.load_units(&jid, &unit_states).await.map_err(|e| e.to_string())?;
+    let units = ProjectRepository::load_units(state.repo.as_ref(), &jid, &unit_states).await
+        .map_err(|e| e.to_string())?;
     Ok(units.into_iter().map(Into::into).collect())
 }
 
