@@ -590,16 +590,14 @@ async fn update_unit(
 
 #[tauri::command]
 async fn list_models(state: State<'_, AppState>) -> Result<Vec<ModelInfoDto>, String> {
-    let catalog = state.catalog.lock().await;
-    let models = catalog.list_installed().await.map_err(|e| e.to_string())?;
+    let models = state.catalog.list_installed().await.map_err(|e| e.to_string())?;
     Ok(models.into_iter().map(Into::into).collect())
 }
 
 #[tauri::command]
 async fn recommend_model(state: State<'_, AppState>, target_lang: String) -> Result<ModelRecommendationDto, String> {
-    let catalog = state.catalog.lock().await;
-    let hw = catalog.detect_hardware().await.map_err(|e| e.to_string())?;
-    let rec = catalog.recommend_model(&hw, &pgl_domain::LangPair {
+    let hw = state.catalog.detect_hardware().await.map_err(|e| e.to_string())?;
+    let rec = state.catalog.recommend_model(&hw, &pgl_domain::LangPair {
         source: Language::new("auto"),
         target: Language::new(target_lang),
     }).await.map_err(|e| e.to_string())?;
@@ -608,8 +606,7 @@ async fn recommend_model(state: State<'_, AppState>, target_lang: String) -> Res
 
 #[tauri::command]
 async fn download_model(state: State<'_, AppState>, window: Window, model_id: String) -> Result<(), String> {
-    let catalog = state.catalog.lock().await;
-    catalog.download_model(&model_id, |downloaded, total| {
+    state.catalog.download_model(&model_id, |downloaded, total| {
         let _ = window.emit("model-download-progress", serde_json::json!({
             "model_id": model_id,
             "downloaded": downloaded,
@@ -621,8 +618,7 @@ async fn download_model(state: State<'_, AppState>, window: Window, model_id: St
 
 #[tauri::command]
 async fn remove_model(state: State<'_, AppState>, model_id: String) -> Result<(), String> {
-    let catalog = state.catalog.lock().await;
-    catalog.remove_model(&model_id).await.map_err(|e| e.to_string())
+    state.catalog.remove_model(&model_id).await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
