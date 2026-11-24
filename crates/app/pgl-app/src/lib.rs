@@ -640,7 +640,7 @@ impl ImportBook {
             }
         }
 
-        best.1.ok_or_else(|| AppError::UnsupportedFormat(format!("No reader for {}", name)))
+        best.1.ok_or_else(|| AppError::UnsupportedFormat(format!("No reader for {}", name))).map(|r| r as Arc<dyn FormatReader + Send + Sync>)
     }
 }
 
