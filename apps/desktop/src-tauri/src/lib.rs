@@ -78,7 +78,7 @@ impl From<pgl_app::Project> for ProjectSummary {
             id: p.id.to_string(),
             name: p.name,
             source_file: p.source_file.to_string_lossy().to_string(),
-            source_format: p.source_format,
+            source_format: p.source_format.clone(),
             created_at: p.created_at.duration_since(std::time::UNIX_EPOCH).unwrap().as_secs().to_string(),
             updated_at: p.updated_at.duration_since(std::time::UNIX_EPOCH).unwrap().as_secs().to_string(),
             overall_progress: p.overall_progress(),
