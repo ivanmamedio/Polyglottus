@@ -305,7 +305,8 @@ async fn list_projects(state: State<'_, AppState>) -> Result<Vec<ProjectSummary>
 #[tauri::command]
 async fn get_project(state: State<'_, AppState>, id: String) -> Result<Option<ProjectSummary>, String> {
     let project_id = uuid::Uuid::parse_str(&id).map_err(|e| e.to_string())?;
-    let project = state.repo.load_project(&project_id).await.map_err(|e| e.to_string())?;
+    let project = ProjectRepository::load_project(state.repo.as_ref(), &project_id).await
+        .map_err(|e| e.to_string())?;
     Ok(project.map(Into::into))
 }
 
@@ -329,7 +330,8 @@ async fn plan_translation(
     job_id: Option<String>,
 ) -> Result<TranslationPlanDto, String> {
     let pid = uuid::Uuid::parse_str(&project_id).map_err(|e| e.to_string())?;
-    let project = state.repo.load_project(&pid).await.map_err(|e| e.to_string())?
+    let project = ProjectRepository::load_project(state.repo.as_ref(), &pid).await
+        .map_err(|e| e.to_string())?
         .ok_or("Project not found")?;
 
     let jid = if let Some(j) = job_id {
