@@ -341,8 +341,8 @@ async fn plan_translation(
     let job = state.repo.load_job(&jid).await.map_err(|e| e.to_string())?
         .ok_or("Job not found")?;
 
-    let catalog = state.catalog.lock().await;
-    let planner = PlanTranslation::new(catalog.clone());
+    let catalog = state.catalog.clone();
+    let planner = PlanTranslation::new(catalog);
     let plan = planner.execute(&job).await.map_err(|e| e.to_string())?;
 
     Ok(plan.into())
