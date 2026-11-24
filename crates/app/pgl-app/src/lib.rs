@@ -586,12 +586,12 @@ pub enum AppEvent {
 
 /// Importa livro e cria projeto
 pub struct ImportBook {
-    readers: Vec<Arc<dyn FormatReader + Send + Sync>>,
+    readers: Vec<Arc<dyn FormatReader>>,
     repo: Arc<dyn ProjectRepository>,
 }
 
 impl ImportBook {
-    pub fn new(readers: Vec<Arc<dyn FormatReader + Send + Sync>>, repo: Arc<dyn ProjectRepository>) -> Self {
+    pub fn new(readers: Vec<Arc<dyn FormatReader>>, repo: Arc<dyn ProjectRepository>) -> Self {
         Self { readers, repo }
     }
 
