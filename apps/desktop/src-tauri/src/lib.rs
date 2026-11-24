@@ -28,6 +28,34 @@ use tracing::{info, error};
 use specta::Type;
 use ts_rs::TS;
 
+// Wrapper que implementa ModelCatalog para Mutex<ModelCatalogImpl>
+// Permite usar Arc<Mutex<ModelCatalogImpl>> onde Arc<dyn ModelCatalog> é esperado
+struct MutexModelCatalog {
+    inner: Arc<Mutex<ModelCatalogImpl>>,
+}
+
+#[async_trait::async_trait]
+impl ModelCatalog for MutexModelCatalog {
+    async fn detect_hardware(&self) -> Result<HardwareProfile, ModelsError> {
+        self.inner.lock().await.detect_hardware().await
+    }
+    async fn recommend_model(&self, profile: &HardwareProfile, lang_pair: &LangPair) -> Result<ModelRecommendation, ModelsError> {
+        self.inner.lock().await.recommend_model(profile, lang_pair).await
+    }
+    async fn download_model(&self, model_id: &str, progress: &dyn Fn(u64, u64)) -> Result<ModelInfo, ModelsError> {
+        self.inner.lock().await.download_model(model_id, progress).await
+    }
+    async fn list_installed(&self) -> Result<Vec<ModelInfo>, ModelsError> {
+        self.inner.lock().await.list_installed().await
+    }
+    async fn remove_model(&self, model_id: &str) -> Result<(), ModelsError> {
+        self.inner.lock().await.remove_model(model_id).await
+    }
+    async fn get_model_path(&self, model_id: &str) -> Result<Option<PathBuf>, ModelsError> {
+        self.inner.lock().await.get_model_path(model_id).await
+    }
+}
+
 // ============================================================================
 // Tipos para IPC (serialização automática via specta/ts-rs)
 // ============================================================================
@@ -181,7 +209,7 @@ pub struct QaWarningDto {
 struct AppState {
     repo: Arc<SqliteRepository>,
     secrets: Arc<SystemSecretStore>,
-    catalog: Arc<Mutex<ModelCatalogImpl>>,
+    catalog: Arc<MutexModelCatalog>,
     fmt_registry: Arc<FormatRegistry>,
     ocr_engine: Option<Arc<dyn pgl_app::OcrEngine>>,
 }
@@ -197,7 +225,9 @@ impl AppState {
             ..Default::default()
         })?;
         catalog.initialize().await?;
-        let catalog = Arc::new(Mutex::new(catalog));
+        let catalog = Arc::new(MutexModelCatalog {
+            inner: Arc::new(Mutex::new(catalog)),
+        });
 
         // Registry de formatos
         let mut fmt_registry = FormatRegistry::new();
