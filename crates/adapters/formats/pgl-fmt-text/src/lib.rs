@@ -8,7 +8,7 @@ pub mod txt;
 pub mod md;
 pub mod srt;
 pub mod vtt;
-pub mod html_text;  // TODO: adaptar para html5ever 0.26 API (parse_document signature changed)
+// pub mod html_text;  // TODO: adaptar para html5ever 0.26 API
 pub mod po;
 pub mod xliff;
 pub mod tmx;

@@ -303,7 +303,6 @@ fn translate_docx_xml(
     reader.trim_text(true);
     let mut writer = XmlWriter::new(Vec::new());
 
-    let mut buf = Vec::new();
     let mut para_idx = 0usize;
     let mut table_idx = 0usize;
     let mut row_idx = 0usize;
@@ -314,7 +313,7 @@ fn translate_docx_xml(
     let mut in_cell = false;
 
     loop {
-        match reader.read_event(&mut buf) {
+        match reader.read_event() {
             Ok(Event::Start(ref e)) => {
                 let tag_name = String::from_utf8_lossy(e.name().as_ref()).to_string();
                 let tag_lower = tag_name.to_lowercase();
@@ -344,7 +343,7 @@ fn translate_docx_xml(
                     }
                 }
 
-                writer.write_event(Event::Text(BytesText::new(new_text)))?;
+                writer.write_event(Event::Text(BytesText::new(&new_text)))?;
             }
             Ok(Event::End(ref e)) => {
                 let tag_name = String::from_utf8_lossy(e.name().as_ref()).to_string();
@@ -375,7 +374,6 @@ fn translate_docx_xml(
             Ok(e) => writer.write_event(e)?,
             Err(e) => return Err(FormatError::Xml(e)),
         }
-        buf.clear();
     }
 
     let result = String::from_utf8(writer.into_inner())
