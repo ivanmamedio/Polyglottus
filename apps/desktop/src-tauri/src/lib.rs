@@ -4,7 +4,7 @@
 #![warn(missing_docs)]
 #![warn(clippy::all, clippy::pedantic, clippy::nursery, clippy::cargo)]
 
-use pgl_app::{ImportBook, PlanTranslation, ExecuteJob, ExportBook, FormatRegistry, EventSink, AppEvent};
+use pgl_app::{ImportBook, PlanTranslation, ExecuteJob, ExportBook, FormatRegistry, EventSink, AppEvent, JobTranslationLookup};
 use pgl_domain::{Language, ExportOptions, OutputFormat, JobConfig, UnitId, UnitState, QaWarning};
 use pgl_fmt_epub::{EpubReader, EpubWriter};
 use pgl_fmt_ooxml::{DocxReader, DocxWriter, PptxReader, PptxWriter, XlsxReader, XlsxWriter};
@@ -415,6 +415,10 @@ async fn export_book(
     let jid = uuid::Uuid::parse_str(&job_id).map_err(|e| e.to_string())?;
     let job = state.repo.load_job(&jid).await.map_err(|e| e.to_string())?.ok_or("Job not found")?;
 
+    // Busca o project para obter o source_file (caminho do arquivo original)
+    let project = state.repo.find_project_for_job(&jid).await.map_err(|e| e.to_string())?
+        .ok_or("Project not found for job")?;
+
     let export_options = ExportOptions {
         output_format: match format.as_str() {
             "same" => OutputFormat::SameAsSource,
@@ -434,8 +438,23 @@ async fn export_book(
         .find(|w| w.id() == export_options.output_format.into() || w.id() == pgl_app::FormatId("any"))
         .ok_or("No writer for format")?;
 
-    let lookup = JobTranslationLookup { repo: state.repo.clone(), job_id: jid };
-    writer.write(&PathBuf::new(), &lookup, &export_options, &PathBuf::from(output_path)).await
+    // Carrega unidades traduzidas do banco para o lookup de exportação
+    let all_states = [
+        pgl_domain::UnitState::Pending,
+        pgl_domain::UnitState::Translated,
+        pgl_domain::UnitState::Flagged,
+        pgl_domain::UnitState::Reviewed,
+        pgl_domain::UnitState::Failed,
+        pgl_domain::UnitState::Skipped,
+    ];
+    let units = state.repo.load_units(&jid, &all_states).await.map_err(|e| e.to_string())?;
+    let mut job_with_units = job;
+    for unit in units {
+        job_with_units.units.insert(unit.id, unit);
+    }
+
+    let lookup = JobTranslationLookup { job: &job_with_units };
+    writer.write(&project.source_file, &lookup, &export_options, &PathBuf::from(output_path)).await
         .map_err(|e| e.to_string())
 }
 
@@ -659,26 +678,6 @@ impl From<pgl_domain::QaWarning> for QaWarningDto {
             message: w.message,
             severity: format!("{:?}", w.severity),
         }
-    }
-}
-
-// ============================================================================
-// Translation Lookup para exportação
-// ============================================================================
-
-struct JobTranslationLookup {
-    repo: Arc<SqliteRepository>,
-    job_id: uuid::Uuid,
-}
-
-impl pgl_app::TranslationLookup for JobTranslationLookup {
-    fn get(&self, unit_id: &UnitId) -> Option<pgl_domain::MarkedText> {
-        // Em produção, buscar do repo
-        None
-    }
-
-    fn get_section(&self, section: &pgl_domain::SectionId) -> Vec<(UnitId, pgl_domain::MarkedText)> {
-        Vec::new()
     }
 }
 

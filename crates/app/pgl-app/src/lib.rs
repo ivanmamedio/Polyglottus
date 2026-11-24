@@ -270,6 +270,13 @@ pub trait FormatWriter: Send + Sync + 'static {
 pub trait TranslationLookup: Send + Sync {
     fn get(&self, unit_id: &UnitId) -> Option<MarkedText>;
     fn get_section(&self, section: &SectionId) -> Vec<(UnitId, MarkedText)>;
+
+    /// Retorna todas as traduções com seus source_refs, para uso em escritores
+    /// de formato que precisam mapear tradução → nó original (patch no lugar).
+    fn all_with_refs(&self) -> Vec<(SourceRef, MarkedText)> {
+        // Default: vazio. Implementações que sabem os source_refs devem sobrescrever.
+        Vec::new()
+    }
 }
 
 /// Provedor de tradução
@@ -910,12 +917,28 @@ impl<W: FormatWriter, Repo: ProjectRepository> ExportBook<W, Repo> {
     }
 
     pub async fn execute(&self, job_id: Uuid, options: ExportOptions) -> Result<ExportReport, AppError> {
-        let job = self.repo.load_job(&job_id).await?
+        let mut job = self.repo.load_job(&job_id).await?
             .ok_or(AppError::JobNotFound(job_id))?;
 
         // Find the project that contains this job to get the source file
         let project = self.repo.find_project_for_job(&job_id).await?
             .ok_or_else(|| AppError::Validation("Project not found for job".into()))?;
+
+        // Carrega unidades do banco e preenche o job para o lookup de exportação
+        // (todos os estados, para incluir unidades traduzidas, revisadas, flagged, etc.)
+        let all_states = [
+            UnitState::Pending,
+            UnitState::Translated,
+            UnitState::Flagged,
+            UnitState::Reviewed,
+            UnitState::Failed,
+            UnitState::Skipped,
+        ];
+        let units = self.repo.load_units(&job_id, &all_states).await
+            .unwrap_or_default();
+        for unit in units {
+            job.units.insert(unit.id, unit);
+        }
 
         // Extract format ID before borrowing job
         let source_format_id = job.config.lang_pair.source.0.clone();
@@ -944,7 +967,7 @@ impl<W: FormatWriter, Repo: ProjectRepository> ExportBook<W, Repo> {
     }
 }
 
-struct JobTranslationLookup<'a> {
+pub struct JobTranslationLookup<'a> {
     job: &'a Job,
 }
 
@@ -957,6 +980,14 @@ impl<'a> TranslationLookup for JobTranslationLookup<'a> {
         self.job.units.iter()
             .filter(|(_, u)| u.section == *section && u.translation.is_some())
             .map(|(id, u)| (*id, u.translation.as_ref().unwrap().clone()))
+            .collect()
+    }
+
+    fn all_with_refs(&self) -> Vec<(SourceRef, MarkedText)> {
+        self.job.units
+            .iter()
+            .filter(|(_, u)| u.translation.is_some())
+            .map(|(_, u)| (u.source_ref.clone(), u.translation.as_ref().unwrap().clone()))
             .collect()
     }
 }

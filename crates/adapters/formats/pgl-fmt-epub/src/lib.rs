@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use std::io::{Cursor, Write};
 use async_trait::async_trait;
 use pgl_app::{FormatReader, FormatWriter, FormatId, Confidence, FormatError, ExportOptions, TranslationLookup, SourceDocument, AssetRef, DocumentMetadata, OutputFormat};
-use pgl_domain::{Unit, UnitId, UnitKind, SectionId, MarkedText, Language, ExportReport, OutputFormat as DomainOutputFormat};
+use pgl_domain::{Unit, UnitId, UnitKind, SectionId, MarkedText, Language, SourceRef, ExportReport, OutputFormat as DomainOutputFormat};
 use pgl_fmt_core::{ZipFormatReader, ZipFormatWriter, ZipSourceDocument, make_source_ref, default_zip_fidelity, sniff_zip_format};
 use epub::doc::EpubDoc;
 use zip::ZipArchive;
@@ -358,10 +358,93 @@ impl ZipFormatWriter for EpubWriter {
     }
 }
 
-/// Aplica traduções ao conteúdo HTML
-/// Por enquanto retorna HTML original - implementação completa requer mapeamento unit_id -> posição
-fn translate_html_content(html: &str, _resource_path: &str, _translations: &dyn TranslationLookup) -> String {
-    html.to_string()
+/// Aplica traduções ao conteúdo HTML de um recurso EPUB.
+///
+/// Percorre elementos de bloco traduzíveis (p, h1-h6, li, td, th, caption, figcaption)
+/// em ordem de documento e substitui o texto pelo conteúdo traduzido quando há
+/// uma tradução disponível para aquele parágrafo (mapeado via source_ref.selector
+/// no formato "paragraph[N]").
+fn translate_html_content(
+    html: &str,
+    resource_path: &str,
+    translations: &dyn TranslationLookup,
+) -> String {
+    use std::collections::HashMap;
+
+    // Coletar traduções para este resource_path, indexadas por número de parágrafo
+    let mut para_map: HashMap<usize, String> = HashMap::new();
+    for (source_ref, translation) in translations.all_with_refs() {
+        if source_ref.internal_path != resource_path {
+            continue;
+        }
+        if let Some(idx) = source_ref
+            .selector
+            .strip_prefix("paragraph[")
+            .and_then(|s| s.strip_suffix("]"))
+            .and_then(|s| s.parse::<usize>().ok())
+        {
+            para_map.insert(idx, translation.raw.clone());
+        }
+    }
+
+    if para_map.is_empty() {
+        return html.to_string();
+    }
+
+    // Tags de bloco que contêm texto traduzível
+    const BLOCK_TAGS: &[&str] = &[
+        "p", "h1", "h2", "h3", "h4", "h5", "h6",
+        "li", "td", "th", "caption", "figcaption",
+    ];
+
+    let mut result = String::with_capacity(html.len());
+    let mut para_counter = 0usize;
+    let mut pos = 0;
+    let bytes = html.as_bytes();
+
+    while pos < bytes.len() {
+        if bytes[pos] == b'<' {
+            // Ler nome da tag de abertura (permitindo atributos)
+            let mut tag_end = pos + 1;
+            while tag_end < bytes.len() && bytes[tag_end].is_ascii_alphanumeric() {
+                tag_end += 1;
+            }
+            let tag_name = std::str::from_utf8(&bytes[pos + 1..tag_end]).unwrap_or("");
+
+            if BLOCK_TAGS.contains(&tag_name) {
+                // Verificar se é tag de abertura (não fechamento) e encontrar o '>'
+                let mut gt = tag_end;
+                while gt < bytes.len() && bytes[gt] != b'>' {
+                    gt += 1;
+                }
+                if gt < bytes.len() && bytes[gt] == b'>' {
+                    // Tag de abertura encontrada. Procurar tag de fechamento correspondente.
+                    let close_tag = format!("</{}>", tag_name);
+                    if let Some(close_pos) = html[gt + 1..].find(&close_tag) {
+                        let content_start = gt + 1;
+                        let content_end = gt + 1 + close_pos;
+                        let original_content = &html[content_start..content_end];
+
+                        if let Some(translated) = para_map.get(&para_counter) {
+                            // Copiar tudo até o início do conteúdo
+                            result.push_str(&html[pos..content_start]);
+                            // Inserir texto traduzido
+                            result.push_str(translated);
+                            // Inserir tag de fechamento
+                            result.push_str(&close_tag);
+                            pos = content_end + close_tag.len();
+                            para_counter += 1;
+                            continue;
+                        }
+                    }
+                }
+            }
+        }
+        result.push(bytes[pos] as char);
+        pos += 1;
+    }
+
+    result
 }
 
 /// Verifica EPUB válido

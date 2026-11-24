@@ -9,7 +9,7 @@ use clap::{Parser, Subcommand};
 use indicatif::{ProgressBar, ProgressStyle};
 use pgl_app::{ImportBook, SecretStore, ProjectRepository, TranslationProvider, ExportOptions, OutputFormat, ExportReport, FormatId, TranslateRequest, TranslationLookup, FormatReader, FormatError, SourceDocument};
 use pgl_app::prelude::FormatRegistry;
-use pgl_domain::{Language, UnitId, SectionId, MarkedText, JobState};
+use pgl_domain::{Language, UnitId, SectionId, MarkedText, JobState, SourceRef};
 use pgl_fmt_epub::{EpubReader, EpubWriter};
 use pgl_fmt_ooxml::{DocxReader, DocxWriter, PptxReader, PptxWriter, XlsxReader, XlsxWriter};
 use pgl_fmt_odf::{OdtReader, OdtWriter, OdpReader, OdpWriter, OdsReader, OdsWriter};
@@ -559,12 +559,17 @@ async fn main() -> anyhow::Result<()> {
                 ..Default::default()
             };
 
+            // Busca o project para obter o source_file (caminho do arquivo original)
+            let project = repo.find_project_for_job(&job_id).await?
+                .ok_or_else(|| anyhow::anyhow!("Project not found for job"))?;
+
             // Encontra writer
             let writer = fmt_registry.writers().iter()
                 .find(|w| w.id().0 == format!("{:?}", export_options.output_format) || w.id() == FormatId("any"))
                 .ok_or_else(|| anyhow::anyhow!("No writer for format"))?;
 
-            let report = writer.write(&PathBuf::new(), &CliTranslationLookup { repo: repo.clone(), job_id }, &export_options, &output).await?;
+            let lookup = CliTranslationLookup::new(repo.clone(), job_id).await;
+            let report = writer.write(&project.source_file, &lookup, &export_options, &output).await?;
             info!("Exported to: {} ({} bytes)", report.output_path, report.output_size);
         }
 
@@ -596,17 +601,42 @@ async fn main() -> anyhow::Result<()> {
 
 /// Translation lookup para CLI
 struct CliTranslationLookup {
-    repo: Arc<SqliteRepository>,
-    job_id: Uuid,
+    units: Vec<pgl_domain::Unit>,
+}
+
+impl CliTranslationLookup {
+    async fn new(repo: Arc<SqliteRepository>, job_id: Uuid) -> Self {
+        let all_states = [
+            pgl_domain::UnitState::Pending,
+            pgl_domain::UnitState::Translated,
+            pgl_domain::UnitState::Flagged,
+            pgl_domain::UnitState::Reviewed,
+            pgl_domain::UnitState::Failed,
+            pgl_domain::UnitState::Skipped,
+        ];
+        let units = repo.load_units(&job_id, &all_states).await
+            .unwrap_or_default();
+        Self { units }
+    }
 }
 
 impl TranslationLookup for CliTranslationLookup {
-    fn get(&self, _unit_id: &UnitId) -> Option<MarkedText> {
-        None
+    fn get(&self, unit_id: &UnitId) -> Option<MarkedText> {
+        self.units.iter().find(|u| u.id == *unit_id)?.translation.clone()
     }
 
     fn get_section(&self, _section: &SectionId) -> Vec<(UnitId, MarkedText)> {
-        Vec::new()
+        self.units.iter()
+            .filter(|u| u.translation.is_some())
+            .map(|u| (u.id, u.translation.as_ref().unwrap().clone()))
+            .collect()
+    }
+
+    fn all_with_refs(&self) -> Vec<(SourceRef, MarkedText)> {
+        self.units.iter()
+            .filter(|u| u.translation.is_some())
+            .map(|u| (u.source_ref.clone(), u.translation.as_ref().unwrap().clone()))
+            .collect()
     }
 }
 

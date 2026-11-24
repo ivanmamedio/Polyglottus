@@ -10,6 +10,7 @@ pgl-fmt-core = { workspace = true }
 pgl-app = { workspace = true }
 pgl-domain = { workspace = true }
 epub = "2"
+scraper = { workspace = true }
 zip = { workspace = true }
 quick-xml = { workspace = true }
 thiserror = { workspace = true }
