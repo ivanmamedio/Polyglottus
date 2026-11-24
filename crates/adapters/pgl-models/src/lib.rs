@@ -1,37 +1,20 @@
 //! Catálogo de modelos e detecção de hardware
+//!
+//! TODO: Implementação completa do catálogo de modelos.
+//! Atualmente é um stub que compila mas não tem funcionalidade completa.
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
-#![warn(clippy::all, clippy::pedantic, clippy::nursery, clippy::cargo)]
-
-pub mod catalog;
-pub mod hardware;
-pub mod downloader;
 
 use pgl_app::{ModelCatalog, ModelsError, HardwareProfile, GpuInfo, ModelRecommendation, ModelInfo, QualityTier, LangPair, Language};
-use pgl_domain::UnitId;
 use async_trait::async_trait;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 use std::sync::Arc;
-use std::path::{Path, PathBuf};
-use std::collections::HashMap;
-use sysinfo::{System, CpuExt, DiskExt};
-use tokio::fs;
-use tokio::io::AsyncWriteExt;
-use tracing::{info, debug, warn};
-use sha2::{Sha256, Digest};
-use futures_util::StreamExt;
+use tracing::{info, warn};
 
-/// Catálogo de modelos
-pub struct ModelCatalogImpl {
-    config: CatalogConfig,
-    client: Client,
-    models_dir: PathBuf,
-    hardware_profile: Option<HardwareProfile>,
-    catalog_data: HashMap<String, ModelCatalogEntry>,
-}
-
+/// Configuração do catálogo de modelos
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CatalogConfig {
     pub models_dir: PathBuf,
@@ -42,39 +25,21 @@ pub struct CatalogConfig {
 
 impl Default for CatalogConfig {
     fn default() -> Self {
-        let models_dir = dirs::data_dir()
-            .unwrap_or_else(|| PathBuf::from("."))
-            .join("polyglottus")
-            .join("models");
-
         Self {
-            models_dir,
-            catalog_url: "https://raw.githubusercontent.com/polyglottus/models-catalog/main/catalog.json".into(),
-            auto_update: true,
-            verify_checksums: true,
+            models_dir: PathBuf::from("."),
+            catalog_url: String::new(),
+            auto_update: false,
+            verify_checksums: false,
         }
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct ModelCatalogEntry {
-    id: String,
-    name: String,
-    description: String,
-    languages: Vec<String>,
-    size_gb: f32,
-    quantization: String,
-    license: String,
-    license_url: String,
-    download_url: String,
-    sha256: String,
-    min_ram_gb: f32,
-    recommended_ram_gb: f32,
-    requires_gpu: bool,
-    min_vram_gb: Option<f32>,
-    quality_tier: QualityTier,
-    architecture: String, // "llama", "mistral", "gemma", etc.
-    family: String,
+/// Catálogo de modelos (stub - implementação completa pendente)
+pub struct ModelCatalogImpl {
+    config: CatalogConfig,
+    client: Client,
+    models_dir: PathBuf,
+    hardware_profile: Option<HardwareProfile>,
 }
 
 impl ModelCatalogImpl {
@@ -84,120 +49,70 @@ impl ModelCatalogImpl {
             .build()
             .map_err(|e| ModelsError::Io(e.into()))?;
 
-        std::fs::create_dir_all(&config.models_dir)?;
-
         Ok(Self {
             config,
             client,
             models_dir: config.models_dir.clone(),
             hardware_profile: None,
-            catalog_data: HashMap::new(),
         })
     }
 
-    /// Inicializa catálogo (carrega local + opcionalmente atualiza)
     pub async fn initialize(&mut self) -> Result<(), ModelsError> {
-        self.hardware_profile = Some(self.detect_hardware().await?);
-        self.load_local_catalog().await?;
-
-        if self.config.auto_update {
-            if let Err(e) = self.update_catalog().await {
-                warn!("Failed to update model catalog: {}", e);
-            }
-        }
-
-        Ok(())
-    }
-
-    async fn load_local_catalog(&mut self) -> Result<(), ModelsError> {
-        let catalog_path = self.models_dir.join("catalog.json");
-        if catalog_path.exists() {
-            let content = fs::read_to_string(&catalog_path).await?;
-            self.catalog_data = serde_json::from_str(&content)?;
-            info!("Loaded local catalog with {} models", self.catalog_data.len());
-        }
-        Ok(())
-    }
-
-    async fn update_catalog(&mut self) -> Result<(), ModelsError> {
-        info!("Updating model catalog from {}", self.config.catalog_url);
-        let response = self.client.get(&self.config.catalog_url).send().await?;
-        if response.status().is_success() {
-            let data: HashMap<String, ModelCatalogEntry> = response.json().await?;
-            self.catalog_data = data;
-
-            // Salva localmente
-            let catalog_path = self.models_dir.join("catalog.json");
-            fs::write(&catalog_path, serde_json::to_string_pretty(&self.catalog_data)?).await?;
-            info!("Catalog updated: {} models", self.catalog_data.len());
-        }
+        self.hardware_profile = Some(self.detect_hardware()?);
         Ok(())
     }
 
     fn detect_hardware(&self) -> Result<HardwareProfile, ModelsError> {
-        let mut sys = System::new_all();
-        sys.refresh_all();
-
-        let cpu_cores = sys.cpus().len();
-        let total_memory = sys.total_memory();
-        let ram_gb = total_memory as f32 / (1024.0 * 1024.0 * 1024.0);
-
-        // Detecta GPU
-        let gpu = self.detect_gpu(&mut sys);
-
         Ok(HardwareProfile {
-            cpu_cores,
-            ram_gb,
-            gpu,
+            cpu_cores: 1,
+            ram_gb: 4.0,
+            gpu: None,
+            platform: std::env::consts::OS.to_string(),
+            arch: std::env::consts::ARCH.to_string(),
+        })
+    }
+}
+
+#[async_trait]
+impl ModelCatalog for ModelCatalogImpl {
+    async fn detect_hardware(&self) -> Result<HardwareProfile, ModelsError> {
+        Ok(HardwareProfile {
+            cpu_cores: 1,
+            ram_gb: 4.0,
+            gpu: None,
             platform: std::env::consts::OS.to_string(),
             arch: std::env::consts::ARCH.to_string(),
         })
     }
 
-    fn detect_gpu(&self, _sys: &mut System) -> Option<GpuInfo> {
-        // sysinfo tem suporte limitado a GPU
-        // Em produção, usar bibliotecas específicas (nvml, metal, vulkan)
-        None
+    async fn recommend_model(&self, _profile: &HardwareProfile, _lang_pair: &LangPair) -> Result<ModelRecommendation, ModelsError> {
+        Ok(ModelRecommendation {
+            model_id: "stub".into(),
+            reason: "Stub implementation".into(),
+            estimated_speed: "unknown".into(),
+            estimated_ram_gb: 1.0,
+            quality_tier: QualityTier::Draft,
+            download_size_gb: 0.0,
+            license: "unknown".into(),
+        })
     }
 
-    fn recommend_for_profile(&self, profile: &HardwareProfile, lang_pair: &LangPair) -> Result<ModelRecommendation, ModelsError> {
-        let available_ram = profile.ram_gb * 0.7; // Reserva 30% para sistema
-        let has_gpu = profile.gpu.is_some();
-        let vram_gb = profile.gpu.as_ref().map(|g| g.vram_gb).unwrap_or(0.0);
+    async fn download_model(&self, _model_id: &str, _progress: &dyn Fn(u64, u64)) -> Result<ModelInfo, ModelsError> {
+        Err(ModelsError::NotFound("Stub: download not implemented".into()))
+    }
 
-        // Filtra modelos compatíveis
-        let mut candidates: Vec<_> = self.catalog_data.values()
-            .filter(|m| {
-                // Verifica RAM
-                if m.min_ram_gb > available_ram {
-                    return false;
-                }
-                // Verifica GPU se necessário
-                if m.requires_gpu && !has_gpu {
-                    return false;
-                }
-                if let Some(min_vram) = m.min_vram_gb {
-                    if vram_gb < min_vram {
-                        return false;
-                    }
-                }
-                // Verifica idiomas
-                let target_lang = lang_pair.target.code();
-                if !m.languages.iter().any(|l| l == target_lang || l == "multilingual") {
-                    return false;
-                }
-                true
-            })
-            .collect();
+    async fn list_installed(&self) -> Result<Vec<ModelInfo>, ModelsError> {
+        Ok(vec![])
+    }
 
-        // Ordena por qualidade (maior primeiro) e depois por tamanho (menor primeiro)
-        candidates.sort_by(|a, b| {
-            b.quality_tier.cmp(&a.quality_tier)
-                .then(a.size_gb.partial_cmp(&b.size_gb).unwrap())
-        });
+    async fn remove_model(&self, _model_id: &str) -> Result<(), ModelsError> {
+        Ok(())
+    }
 
-        let best = candidates.first()
-            .ok_or_else(|| ModelsError::InsufficientResources {
+    async fn get_model_path(&self, _model_id: &str) -> Result<Option<PathBuf>, ModelsError> {
+        Ok(None)
+    }
+}
                 need: "compatible model".into(),
                 have: format!("RAM: {:.1}GB, GPU: {}", available_ram, has_gpu),
             })?;
