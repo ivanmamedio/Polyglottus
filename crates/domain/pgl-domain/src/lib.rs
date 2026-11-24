@@ -468,7 +468,7 @@ pub use glossary::{Glossary, GlossaryEntry};
 pub use job::{Job, JobConfig, JobProgress, JobState};
 pub use marked_text::{MarkedText, MarkError};
 pub use project::Project;
-pub use qa::{QaChecker, QaConfig, QaResult, QaWarning};
+pub use qa::{QaChecker, QaConfig, QaResult};
 pub use segmentation::{Segment, SegmentationRule};
 pub use style_guide::StyleGuide;
 pub use unit::Unit;
