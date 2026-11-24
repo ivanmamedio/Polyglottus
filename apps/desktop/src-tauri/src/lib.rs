@@ -605,15 +605,8 @@ async fn recommend_model(state: State<'_, AppState>, target_lang: String) -> Res
 }
 
 #[tauri::command]
-async fn download_model(state: State<'_, AppState>, window: Window, model_id: String) -> Result<(), String> {
-    state.catalog.download_model(&model_id, |downloaded, total| {
-        let _ = window.emit("model-download-progress", serde_json::json!({
-            "model_id": model_id,
-            "downloaded": downloaded,
-            "total": total,
-            "percent": if total > 0 { (downloaded as f64 / total as f64 * 100.0) as u8 } else { 0 }
-        }));
-    }).await.map_err(|e| e.to_string())
+async fn download_model(state: State<'_, AppState>, _window: Window, model_id: String) -> Result<(), String> {
+    state.catalog.download_model(&model_id, |_, _| {}).await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
