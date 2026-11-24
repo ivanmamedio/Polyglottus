@@ -5,7 +5,7 @@
 #![warn(clippy::all, clippy::pedantic, clippy::nursery, clippy::cargo)]
 
 use pgl_app::{ImportBook, PlanTranslation, ExecuteJob, EventSink, AppEvent, JobTranslationLookup, prelude::FormatRegistry, SecretStore, ProjectRepository, ModelCatalog, HardwareProfile, ModelsError, LangPair, ModelRecommendation, ModelInfo};
-use pgl_domain::{Language, ExportOptions, OutputFormat, UnitId, UnitState};
+use pgl_domain::{Language};
 use pgl_fmt_epub::{EpubReader, EpubWriter};
 use pgl_fmt_ooxml::{DocxReader, DocxWriter, PptxReader, PptxWriter, XlsxReader, XlsxWriter};
 use pgl_fmt_odf::{OdtReader, OdtWriter, OdpReader, OdpWriter, OdsReader, OdsWriter};
@@ -557,7 +557,7 @@ async fn export_book(
 #[tauri::command]
 async fn get_units(state: State<'_, AppState>, job_id: String, states: Vec<String>) -> Result<Vec<UnitDto>, String> {
     let jid = uuid::Uuid::parse_str(&job_id).map_err(|e| e.to_string())?;
-    let unit_states: Vec<UnitState> = states.iter().filter_map(|s| serde_json::from_str(s).ok()).collect();
+    let unit_states: Vec<pgl_domain::UnitState> = states.iter().filter_map(|s| serde_json::from_str(s).ok()).collect();
     let units = ProjectRepository::load_units(state.repo.as_ref(), &jid, &unit_states).await
         .map_err(|e| e.to_string())?;
     Ok(units.into_iter().map(Into::into).collect())
@@ -570,7 +570,7 @@ async fn update_unit(
     translation: String,
     action: String, // "approve", "edit", "retranslate"
 ) -> Result<(), String> {
-    let uid = UnitId(uuid::Uuid::parse_str(&unit_id).map_err(|e| e.to_string())?);
+    let uid = pgl_domain::UnitId(uuid::Uuid::parse_str(&unit_id).map_err(|e| e.to_string())?);
     let mut unit = state.repo.load_unit(&uid).await.map_err(|e| e.to_string())?.ok_or("Unit not found")?;
 
     match action.as_str() {
