@@ -585,13 +585,13 @@ pub enum AppEvent {
 // ============================================================================
 
 /// Importa livro e cria projeto
-pub struct ImportBook<R: FormatReader, Repo: ProjectRepository> {
-    readers: Vec<Arc<R>>,
-    repo: Arc<Repo>,
+pub struct ImportBook {
+    readers: Vec<Arc<dyn FormatReader + Send + Sync>>,
+    repo: Arc<dyn ProjectRepository>,
 }
 
-impl<R: FormatReader, Repo: ProjectRepository> ImportBook<R, Repo> {
-    pub fn new(readers: Vec<Arc<R>>, repo: Arc<Repo>) -> Self {
+impl ImportBook {
+    pub fn new(readers: Vec<Arc<dyn FormatReader + Send + Sync>>, repo: Arc<dyn ProjectRepository>) -> Self {
         Self { readers, repo }
     }
 
@@ -628,7 +628,7 @@ impl<R: FormatReader, Repo: ProjectRepository> ImportBook<R, Repo> {
         Ok(project)
     }
 
-    async fn detect_format(&self, path: &Path) -> Result<Arc<R>, AppError> {
+    async fn detect_format(&self, path: &Path) -> Result<Arc<dyn FormatReader + Send + Sync>, AppError> {
         let name = path.file_name().and_then(|s| s.to_str()).unwrap_or("");
         let head = std::fs::read(path)?.into_iter().take(1024).collect::<Vec<_>>();
 
