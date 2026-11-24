@@ -28,6 +28,7 @@ pgl-ocr = { workspace = true }
 pgl-storage = { workspace = true }
 pgl-secrets = { workspace = true }
 pgl-models = { workspace = true }
+async-trait = { workspace = true }
 
 serde = { workspace = true }
 serde_json = { workspace = true }
