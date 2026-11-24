@@ -20,7 +20,6 @@ use pgl_storage::SqliteRepository;
 use pgl_secrets::SystemSecretStore;
 use pgl_models::ModelCatalogImpl;
 use tauri::{Manager, State, Window, Emitter};
-use async_trait::async_trait;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::Mutex;
