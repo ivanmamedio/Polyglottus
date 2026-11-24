@@ -4,7 +4,7 @@
 #![warn(missing_docs)]
 #![warn(clippy::all, clippy::pedantic, clippy::nursery, clippy::cargo)]
 
-use pgl_app::{ImportBook, PlanTranslation, ExecuteJob, ExportBook, FormatRegistry, EventSink, AppEvent, JobTranslationLookup};
+use pgl_app::{ImportBook, PlanTranslation, ExecuteJob, ExportBook, EventSink, AppEvent, JobTranslationLookup, prelude::FormatRegistry, SecretStore};
 use pgl_domain::{Language, ExportOptions, OutputFormat, JobConfig, UnitId, UnitState, QaWarning};
 use pgl_fmt_epub::{EpubReader, EpubWriter};
 use pgl_fmt_ooxml::{DocxReader, DocxWriter, PptxReader, PptxWriter, XlsxReader, XlsxWriter};
@@ -12,9 +12,9 @@ use pgl_fmt_odf::{OdtReader, OdtWriter, OdpReader, OdpWriter, OdsReader, OdsWrit
 use pgl_fmt_text::{TxtReader, TxtWriter, MdReader, MdWriter, SrtReader, SrtWriter, VttReader, VttWriter, PoReader, PoWriter, XliffReader, XliffWriter, TmxReader, TmxWriter, JsonI18nReader, JsonI18nWriter};
 use pgl_fmt_pdf::{PdfReflowReader, PdfOverlayWriter};
 use pgl_fmt_convert::{ConverterRegistry, ConvertReader, ConvertWriter};
-use pgl_providers_openai::OpenAICompatProvider;
-use pgl_providers_ollama::OllamaProvider;
-use pgl_providers_embedded::EmbeddedProvider;
+use pgl_provider_openai::OpenAICompatProvider;
+use pgl_provider_ollama::OllamaProvider;
+// use pgl_provider_embedded::EmbeddedProvider;  # Disabled: needs llama-cpp-sys-2
 use pgl_ocr::OcrEngineFactory;
 use pgl_storage::SqliteRepository;
 use pgl_secrets::SystemSecretStore;
@@ -349,12 +349,7 @@ async fn start_translation(
             Arc::new(p)
         }
         "embedded" => {
-            let catalog = state.catalog.lock().await;
-            let model_path = catalog.get_model_path(&model.unwrap_or_default()).await.map_err(|e| e.to_string())?.ok_or("Model not downloaded")?;
-            let mut p = EmbeddedProvider::new(pgl_providers_embedded::EmbeddedConfig::default())
-                .with_model_path(model_path);
-            p.load_model().map_err(|e| e.to_string())?;
-            Arc::new(p)
+            return Err("Embedded provider disabled: needs llama-cpp-sys-2 build tools".into());
         }
         _ => return Err(format!("Unknown provider: {}", provider)),
     };
