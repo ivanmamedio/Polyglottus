@@ -11,7 +11,7 @@ use pgl_fmt_ooxml::{DocxReader, DocxWriter, PptxReader, PptxWriter, XlsxReader, 
 use pgl_fmt_odf::{OdtReader, OdtWriter, OdpReader, OdpWriter, OdsReader, OdsWriter};
 use pgl_fmt_text::{TxtReader, TxtWriter, MdReader, MdWriter, SrtReader, SrtWriter, VttReader, VttWriter, PoReader, PoWriter, XliffReader, XliffWriter, TmxReader, TmxWriter, JsonI18nReader, JsonI18nWriter};
 use pgl_fmt_pdf::{PdfReflowReader, PdfOverlayWriter};
-use pgl_fmt_convert::{ConverterRegistry, ConvertReader, ConvertWriter};
+use pgl_fmt_convert::{ConverterRegistry, ConvertReader, ConvertWriter, ConverterType};
 use pgl_provider_openai::OpenAICompatProvider;
 use pgl_provider_ollama::OllamaProvider;
 // use pgl_provider_embedded::EmbeddedProvider;  # Disabled: needs llama-cpp-sys-2
@@ -20,6 +20,7 @@ use pgl_storage::SqliteRepository;
 use pgl_secrets::SystemSecretStore;
 use pgl_models::ModelCatalogImpl;
 use tauri::{Manager, State, Window, Emitter};
+use async_trait::async_trait;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -207,9 +208,15 @@ impl AppState {
 
         // Conversores
         let converter_registry = ConverterRegistry::default();
-        for converter in converter_registry.converters {
-            fmt_registry.register_reader(Arc::new(ConvertReader::new(converter.clone())));
-            fmt_registry.register_writer(Arc::new(ConvertWriter::new(converter)));
+        for converter_name in converter_registry.available() {
+            let converter_type = match converter_name {
+                "pandoc" => ConverterType::Pandoc,
+                "calibre" => ConverterType::Calibre,
+                "libreoffice" => ConverterType::LibreOffice,
+                _ => continue,
+            };
+            fmt_registry.register_reader(Arc::new(ConvertReader::new(converter_type)));
+            fmt_registry.register_writer(Arc::new(ConvertWriter::new(converter_type)));
         }
 
         // OCR
