@@ -465,13 +465,13 @@ pub enum QaSeverity {
 
 /// Re-export dos submódulos principais
 pub use glossary::{Glossary, GlossaryEntry};
-pub use job::{Job, JobConfig, JobProgress, JobState};
+pub use job::{Job, JobConfig, JobProgress, JobState, UnitState};
 pub use marked_text::{MarkedText, MarkError};
 pub use project::Project;
 pub use qa::{QaChecker, QaConfig, QaResult};
 pub use segmentation::{Segment, SegmentationRule};
 pub use style_guide::StyleGuide;
-pub use unit::Unit;
+pub use unit::{Unit, UnitId};
 
 /// Prelude para imports convenientes
 pub mod prelude {
