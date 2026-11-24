@@ -4,7 +4,7 @@
 #![warn(missing_docs)]
 #![warn(clippy::all, clippy::pedantic, clippy::nursery, clippy::cargo)]
 
-use pgl_app::{ImportBook, PlanTranslation, ExecuteJob, ExportBook, EventSink, AppEvent, JobTranslationLookup, prelude::FormatRegistry, SecretStore};
+use pgl_app::{ImportBook, PlanTranslation, ExecuteJob, ExportBook, EventSink, AppEvent, JobTranslationLookup, prelude::FormatRegistry, SecretStore, ProjectRepository};
 use pgl_domain::{Language, ExportOptions, OutputFormat, JobConfig, UnitId, UnitState, QaWarning};
 use pgl_fmt_epub::{EpubReader, EpubWriter};
 use pgl_fmt_ooxml::{DocxReader, DocxWriter, PptxReader, PptxWriter, XlsxReader, XlsxWriter};
