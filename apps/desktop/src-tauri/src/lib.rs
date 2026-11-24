@@ -373,10 +373,16 @@ async fn start_translation(
     // Cria provedor
     let translation_provider: Arc<dyn pgl_app::TranslationProvider> = match provider.as_str() {
         "openai" => {
-            let key = state.secrets.get("openai").await.unwrap_or(None).unwrap_or_default();
-            let mut p = OpenAICompatProvider::openai(key).map_err(|e| e.to_string())?;
-            if let Some(u) = url { p.config.base_url = u; }
-            if let Some(m) = model { p.default_model = m; }
+            let key = state.secrets.get("openai").await.unwrap_or(None);
+            let config = pgl_provider_openai::OpenAICompatConfig {
+                base_url: url.unwrap_or_else(|| "https://api.openai.com/v1".into()),
+                api_key: key,
+                organization: None,
+                timeout_secs: 120,
+                max_retries: 3,
+            };
+            let mut p = OpenAICompatProvider::new(config).map_err(|e| e.to_string())?;
+            if let Some(m) = model { p = p.with_model(m); }
             Arc::new(p)
         }
         "ollama" => {
@@ -384,7 +390,7 @@ async fn start_translation(
                 base_url: url.unwrap_or_else(|| "http://localhost:11434".into()),
                 ..Default::default()
             }).map_err(|e| e.to_string())?;
-            if let Some(m) = model { p.default_model = m; }
+            if let Some(m) = model { p = p.with_model(m); }
             Arc::new(p)
         }
         "embedded" => {
