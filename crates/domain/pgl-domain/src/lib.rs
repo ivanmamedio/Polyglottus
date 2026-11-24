@@ -472,8 +472,6 @@ pub use qa::{QaChecker, QaConfig, QaResult};
 pub use segmentation::{Segment, SegmentationRule};
 pub use style_guide::StyleGuide;
 pub use unit::{Unit};
-pub use UnitId;
-pub use UnitState;
 
 /// Prelude para imports convenientes
 pub mod prelude {
