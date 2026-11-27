@@ -9,7 +9,6 @@ license = "MIT OR Apache-2.0"
 pgl-fmt-core = { workspace = true }
 pgl-app = { workspace = true }
 pgl-domain = { workspace = true }
-html5ever = { workspace = true }
 scraper = { workspace = true }
 quick-xml = { workspace = true }
 thiserror = { workspace = true }

@@ -11,15 +11,10 @@ keywords = ["translation", "books", "documents", "domain"]
 [dependencies]
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
-serde_with = { workspace = true }
 thiserror = { workspace = true }
 uuid = { workspace = true, features = ["v4", "v7", "serde", "fast-rng"] }
-chrono = { workspace = true, features = ["serde"] }
-hex = { workspace = true }
 csv = { workspace = true }
 regex = { workspace = true }
-comrak = { version = "0.20", features = ["default"] }
-html5ever = { workspace = true }
 blake3 = "1"
 
 [dev-dependencies]

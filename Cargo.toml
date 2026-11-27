@@ -118,6 +118,7 @@ tauri-plugin-sql = "2"
 # Utils
 uuid = { version = "1.7", features = ["v4", "v7", "serde", "fast-rng"] }
 chrono = { version = "0.4", features = ["serde"] }
+schemars = "0.9"
 url = "2.5"
 percent-encoding = "2.3"
 mime = "0.3"

@@ -13,7 +13,7 @@ pub mod events;
 use std::path::Path;
 use std::sync::Arc;
 use std::collections::HashMap;
-use pgl_domain::prelude::*;
+
 use pgl_domain::unit::PlaceholderError;
 use uuid::Uuid;
 use serde::{Serialize, Deserialize};
@@ -86,7 +86,7 @@ pub mod prelude {
         ImportBook, PlanTranslation, ExecuteJob, ReviewUnit, ExportBook,
     };
     pub use crate::registry::FormatRegistry;
-    pub use pgl_domain::prelude::*;
+    // pub use pgl_domain::prelude::*;
 }
 
 // ============================================================================
@@ -586,7 +586,7 @@ pub enum AppEvent {
 
 /// Importa livro e cria projeto
 pub struct ImportBook {
-    readers: Vec<Arc<dyn FormatReader>>,
+    readers: Vec<Arc<dyn FormatReader + Send + Sync>>,
     repo: Arc<dyn ProjectRepository>,
 }
 
