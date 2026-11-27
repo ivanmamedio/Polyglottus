@@ -18,7 +18,6 @@ use pgl_fmt_pdf::{PdfReflowReader, PdfOverlayWriter};
 use pgl_fmt_convert::{ConverterRegistry, ConvertReader, ConvertWriter, ConverterType};
 use pgl_provider_openai::OpenAICompatProvider;
 use pgl_provider_ollama::OllamaProvider;
-use pgl_provider_embedded::EmbeddedProvider;
 use pgl_testkit::FakeProvider;
 use pgl_ocr::OcrEngineFactory;
 use pgl_storage::SqliteRepository;
@@ -430,6 +429,7 @@ async fn main() -> anyhow::Result<()> {
                 repo.save_job(job, &project.id).await?;
             }
             info!("Project created: {} ({})", project.name, project.id);
+            println!("Project ID: {}", project.id);
         }
 
         Commands::List => {
@@ -493,14 +493,6 @@ async fn main() -> anyhow::Result<()> {
                     if let Some(ref m) = model { p = p.with_model(m.to_string()); }
                     Arc::new(p)
                 }
-                "embedded" => {
-                    let path = model_path.ok_or_else(|| anyhow::anyhow!("model_path required for embedded provider"))?;
-                    let path_str = path.to_string_lossy().to_string();
-                    let mut p = EmbeddedProvider::new(pgl_provider_embedded::EmbeddedConfig::default())?
-                        .with_model_path(path_str);
-                    p.load_model()?;
-                    Arc::new(p)
-                }
                 _ => anyhow::bail!("Unknown provider: {}", provider),
             };
 
@@ -542,6 +534,7 @@ async fn main() -> anyhow::Result<()> {
             execute_translation(translation_provider, qa_checker, repo.clone(), job_id, &pb).await?;
 
             pb.finish_with_message("Translation completed!");
+            println!("Job ID: {}", job_id);
         }
 
         Commands::Export { job, output, format, bilingual } => {
@@ -567,7 +560,7 @@ async fn main() -> anyhow::Result<()> {
 
             // Encontra writer
             let writer = fmt_registry.writers().iter()
-                .find(|w| w.id().0 == format!("{:?}", export_options.output_format) || w.id() == FormatId("any"))
+                .find(|w| w.id().0 == format!("{:?}", export_options.output_format).to_lowercase() || w.id() == FormatId("any"))
                 .ok_or_else(|| anyhow::anyhow!("No writer for format"))?;
 
             let lookup = CliTranslationLookup::new(repo.clone(), job_id).await;

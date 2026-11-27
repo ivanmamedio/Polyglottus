@@ -306,7 +306,7 @@ pub mod helpers {
     }
 
     /// Cria ImportBook para testes com readers específicos
-    pub fn test_import_book(registry: FormatRegistry, repo: Arc<SqliteRepository>) -> ImportBook<EpubReader, SqliteRepository> {
+    pub fn test_import_book(registry: FormatRegistry, repo: Arc<SqliteRepository>) -> ImportBook {
         ImportBook::new(vec![Arc::new(EpubReader::new())], repo)
     }
 

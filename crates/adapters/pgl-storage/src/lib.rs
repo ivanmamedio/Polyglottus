@@ -657,7 +657,7 @@ impl ProjectRepository for SqliteRepository {
             let metadata = metadata.as_deref().and_then(|s| serde_json::from_str(s).ok()).unwrap_or_default();
 
             Ok(Some(Project {
-                id: Uuid::from_slice(&row.get::<Vec<u8>, _>("id")).map_err(|e| StorageError::Serialization(e.to_string()))?,
+                id: Uuid::parse_str(&row.get::<String, _>("id")).map_err(|e| StorageError::Serialization(e.to_string()))?,
                 name: row.get("name"),
                 source_file: PathBuf::from(row.get::<String, _>("source_file")),
                 source_format: row.get("source_format"),

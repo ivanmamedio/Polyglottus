@@ -20,7 +20,6 @@ pgl-fmt-odf = { workspace = true }
 pgl-fmt-convert = { workspace = true }
 pgl-provider-openai = { workspace = true }
 pgl-provider-ollama = { workspace = true }
-pgl-provider-embedded = { workspace = true }
 pgl-ocr = { workspace = true }
 pgl-storage = { workspace = true }
 pgl-secrets = { workspace = true }

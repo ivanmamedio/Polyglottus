@@ -12,9 +12,20 @@ use pgl_app::{FormatReader, FormatWriter, FormatId, Confidence, FormatError, Exp
 use pgl_domain::{Unit, UnitId, UnitKind, SectionId, MarkedText, Language, SourceRef, ExportReport, OutputFormat as DomainOutputFormat};
 use pgl_fmt_core::{ZipFormatReader, ZipFormatWriter, ZipSourceDocument, make_source_ref, default_zip_fidelity, sniff_zip_format};
 use epub::doc::EpubDoc;
-use zip::ZipArchive;
+use zip::{ZipArchive, ZipWriter};
 use uuid::Uuid;
 use tokio::fs;
+
+/// Cria um ZIP vazio válido para uso como archive placeholder
+fn create_empty_zip() -> Vec<u8> {
+    use std::io::Cursor;
+    let mut buf = Vec::new();
+    {
+        let mut zip = ZipWriter::new(Cursor::new(&mut buf));
+        zip.finish().unwrap();
+    }
+    buf
+}
 
 /// Leitor EPUB (usa epub crate para parsing robusto)
 pub struct EpubReader;
@@ -145,7 +156,7 @@ impl FormatReader for EpubReader {
         };
 
         // Archive vazio (não usado para leitura streaming)
-        let empty_archive = ZipArchive::new(std::io::Cursor::new(Vec::new())).unwrap();
+        let empty_archive = ZipArchive::new(std::io::Cursor::new(create_empty_zip())).unwrap();
 
         Ok(Box::new(ZipSourceDocument::new(
             empty_archive,
