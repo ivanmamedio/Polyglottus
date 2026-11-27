@@ -1,361 +1,85 @@
 <script lang="ts">
-  import { createEventDispatcher, onMount } from 'svelte';
+  import { onMount } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
-  import { listen } from '@tauri-apps/api/event';
 
-  export let projectId: string;
-  export let onBack: () => void;
-
-  const dispatch = createEventDispatcher();
-
-  interface JobSummary {
-    id: string;
-    project_id: string;
-    target_language: string;
-    state: string;
-    progress: {
-      total: number;
-      completed: number;
-      failed: number;
-      flagged: number;
-      pending: number;
-      percent: number;
-      elapsed_secs: number;
-      eta_secs: number | null;
-      units_per_second: number;
-    };
-    created_at: string;
-    updated_at: string;
-  }
-
-  interface UnitDto {
-    id: string;
-    source_text: string;
-    translated_text: string | null;
-    kind: string;
-    state: string;
-    section: string;
-    qa_warnings: Array<{
-      code: string;
-      message: string;
-      severity: string;
-    }>;
-  }
-
-  let job: JobSummary | null = null;
-  let units: UnitDto[] = [];
-  let loading = false;
-  let error: string | null = null;
-  let selectedUnit: UnitDto | null = null;
-
-  let provider = 'ollama';
-  let model = '';
-  let batchSize = 10;
-  let maxParallel = 3;
-  let targetLang = 'pt-BR';
+  export let project: any = null;
+  export let units: any[] = [];
+  export let loading = false;
+  export let error: string | null = null;
 
   async function loadProject() {
-    loading = true;
     try {
-      const proj = await invoke<any>('get_project', { id: projectId });
-      // Get active job
-      const jobs = await invoke<JobSummary[]>('list_jobs', { project_id: projectId });
-      job = jobs.find(j => j.state !== 'Completed' && j.state !== 'Cancelled') ?? jobs[0] ?? null;
+      project = await invoke<any>('get_project', { id: project?.id || '' });
     } catch (e) {
       error = 'Failed to load project';
       console.error(e);
-    } finally {
-      loading = false;
     }
   }
 
   async function loadUnits() {
-    if (!job) return;
     try {
-      units = await invoke<UnitDto[]>('get_units', {
-        job_id: job.id,
-        states: JSON.stringify(['Pending', 'Translated', 'Flagged', 'Reviewed']),
-      });
+      units = await invoke<any[]>('list_units', { project_id: project?.id || '' });
     } catch (e) {
       console.error('Failed to load units', e);
-    }
-  }
-
-  async function startTranslation() {
-    if (!job) return;
-    loading = true;
-    try {
-      await invoke('start_translation', {
-        job_id: job.id,
-        provider,
-        model: model || null,
-        batch_size: batchSize,
-        max_parallel: maxParallel,
-      });
-      await loadProject();
-    } catch (e) {
-      error = 'Failed to start translation';
-      console.error(e);
-    } finally {
-      loading = false;
-    }
-  }
-
-  async function pauseTranslation() {
-    if (!job) return;
-    await invoke('pause_translation', { job_id: job.id });
-    await loadProject();
-  }
-
-  async function resumeTranslation() {
-    if (!job) return;
-    await invoke('resume_translation', { job_id: job.id });
-    await loadProject();
-  }
-
-  async function cancelTranslation() {
-    if (!job) return;
-    await invoke('cancel_translation', { job_id: job.id });
-    await loadProject();
-  }
-
-  async function updateUnit(unitId: string, action: string, translation?: string) {
-    await invoke('update_unit', {
-      unit_id: unitId,
-      translation: translation || '',
-      action,
-    });
-    await loadUnits();
-    selectedUnit = null;
-  }
-
-  function formatETA(secs: number | null): string {
-    if (!secs) return '--';
-    const h = Math.floor(secs / 3600);
-    const m = Math.floor((secs % 3600) / 60);
-    const s = secs % 60;
-    return h > 0 ? `${h}h ${m}m ${s}s` : `${m}m ${s}s`;
-  }
-
-  function getStateColor(state: string): string {
-    switch (state) {
-      case 'Completed': return 'bg-green-100 text-green-800';
-      case 'Failed': return 'bg-red-100 text-red-800';
-      case 'Running': return 'bg-blue-100 text-blue-800';
-      case 'Paused': return 'bg-yellow-100 text-yellow-800';
-      case 'Created': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
     }
   }
 
   onMount(async () => {
     await loadProject();
     await loadUnits();
-
-    listen('app-event', (event) => {
-      const payload: any = event.payload;
-      if (payload.type === 'JobProgress' || payload.type === 'JobCompleted' || payload.type === 'JobFailed') {
-        loadProject();
-        loadUnits();
-      }
-    });
   });
 </script>
 
 <div class="space-y-6">
-  <div class="flex items-center justify-between">
-    <button onclick={onBack} class="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900">
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-      </svg>
-      Back
-    </button>
-    <h1 class="text-xl font-bold text-gray-900">Project Details</h1>
-  </div>
+  <h1 class="text-xl font-bold text-gray-900">Project Details</h1>
 
   {#if loading}
-    <div class="py-8 text-center text-gray-500">Loading...</div>
-  {:else if error}
-    <div class="p-4 bg-red-50 border border-red-200 rounded-md text-red-800 text-sm">{error}</div>
-  {:else if job}
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-      <div class="col-span-1 md:col-span-2">
-        <!-- Job Status -->
-        <div class="border border-gray-200 rounded-lg p-6 mb-6">
-          <div class="flex items-center justify-between mb-4">
-            <div>
-              <h2 class="text-lg font-semibold text-gray-900">Translation Job</h2>
-              <p class="text-sm text-gray-500">Target: {job.target_language}</p>
-            </div>
-            <span class={getStateColor(job.state)} class="px-3 py-1 rounded-full text-xs font-semibold uppercase">
-              {job.state}
-            </span>
-          </div>
-
-          <div class="space-y-3">
-            <div class="flex justify-between text-sm">
-              <span class="text-gray-600">Progress</span>
-              <span class="font-medium">{job.progress.percent}%</span>
-            </div>
-            <div class="w-full bg-gray-200 rounded-full h-3">
-              <div class="bg-indigo-600 h-3 rounded-full" style="width: {job.progress.percent}%"></div>
-            </div>
-            <div class="flex justify-between text-xs text-gray-500">
-              <span>{job.progress.completed} / {job.progress.total} units</span>
-              <span>{job.progress.flagged} flagged</span>
-              <span>{job.progress.failed} failed</span>
-            </div>
-            <div class="flex justify-between text-sm text-gray-500">
-              <span>ETA: {formatETA(job.progress.eta_secs)}</span>
-              <span>{job.progress.units_per_second.toFixed(1)} units/sec</span>
-            </div>
-          </div>
-
-          <!-- Translation Controls -->
-          <div class="mt-6 pt-6 border-t border-gray-200">
-            <h3 class="text-sm font-semibold text-gray-900 mb-4">Start Translation</h3>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label class="block text-xs font-medium text-gray-700 mb-1">Provider</label>
-                <select bind:value={provider} class="w-full p-2 border border-gray-300 rounded-md text-sm">
-                  <option value="ollama">Ollama (local)</option>
-                  <option value="openai">OpenAI-compatible</option>
-                  <option value="embedded">Embedded (llama.cpp)</option>
-                  <option value="fake">Fake (testing)</option>
-                </select>
-              </div>
-              <div>
-                <label class="block text-xs font-medium text-gray-700 mb-1">Target Language</label>
-                <select bind:value={targetLang} class="w-full p-2 border border-gray-300 rounded-md text-sm">
-                  <option value="pt-BR">Portuguese (Brazil)</option>
-                  <option value="es">Spanish</option>
-                  <option value="fr">French</option>
-                  <option value="de">German</option>
-                  <option value="en">English</option>
-                </select>
-              </div>
-              <div>
-                <label class="block text-xs font-medium text-gray-700 mb-1">Model</label>
-                <input bind:value={model} type="text" placeholder="e.g., llama3" class="w-full p-2 border border-gray-300 rounded-md text-sm" />
-              </div>
-              <div>
-                <label class="block text-xs font-medium text-gray-700 mb-1">Batch Size</label>
-                <input bind:value={batchSize} type="number" value="10" class="w-full p-2 border border-gray-300 rounded-md text-sm" />
-              </div>
-            </div>
-            <div class="mt-4">
-              {#if job.state === 'Running'}
-                <button onclick={pauseTranslation} class="px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition">
-                  Pause
-                </button>
-                <button onclick={cancelTranslation} class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition ml-2">
-                  Cancel
-                </button>
-              {:else if job.state === 'Paused'}
-                <button onclick={resumeTranslation} class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition">
-                  Resume
-                </button>
-                <button onclick={cancelTranslation} class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition ml-2">
-                  Cancel
-                </button>
-              {:else}
-                <button onclick={startTranslation} class="px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition font-medium">
-                  Start Translation
-                </button>
-              {/if}
-            </div>
-          </div>
-        </div>
-
-        <!-- Units List -->
-        <div class="border border-gray-200 rounded-lg">
-          <div class="p-4 border-b border-gray-200">
-            <h2 class="text-lg font-semibold text-gray-900">Units ({units.length})</h2>
-          </div>
-          <div class="overflow-x-auto">
-            <table class="w-full text-left text-sm">
-              <thead class="bg-gray-50">
-                <tr>
-                  <th class="px-4 py-3 font-medium text-gray-600">Source</th>
-                  <th class="px-4 py-3 font-medium text-gray-600">Translation</th>
-                  <th class="px-4 py-3 font-medium text-gray-600">State</th>
-                  <th class="px-4 py-3 font-medium text-gray-600">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {#each units as unit}
-                  <tr class="border-b border-gray-100 hover:bg-gray-50">
-                    <td class="px-4 py-3 text-gray-700 max-w-xs truncate">{unit.source_text}</td>
-                    <td class="px-4 py-3 {unit.translated_text ? 'text-green-700' : 'text-gray-400 italic'}" max-w-xs truncate>
-                      {unit.translated_text ?? '—'}
-                    </td>
-                    <td class="px-4 py-3">
-                      <span class={getStateColor(unit.state)} class="px-2 py-0.5 rounded text-xs font-semibold">
-                        {unit.state}
-                      </span>
-                    </td>
-                    <td class="px-4 py-3">
-                      {#if unit.translated_text && unit.state === 'Translated'}
-                        <button onclick={() => updateUnit(unit.id, 'approve')} class="text-xs text-green-600 hover:text-green-800 mr-2">Approve</button>
-                      {/if}
-                      <button onclick={() => { selectedUnit = unit; }} class="text-xs text-indigo-600 hover:text-indigo-800 mr-2">Edit</button>
-                      <button onclick={() => updateUnit(unit.id, 'retranslate')} class="text-xs text-orange-600 hover:text-orange-800">Retranslate</button>
-                    </td>
-                  </tr>
-                {/each}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <div class="col-span-1 md:col-span-1 space-y-6">
-        <!-- Export -->
-        <div class="border border-gray-200 rounded-lg p-6">
-          <h3 class="text-sm font-semibold text-gray-900 mb-4">Export</h3>
-          <div class="space-y-3">
-            <select class="w-full p-2 border border-gray-300 rounded-md text-sm">
-              <option value="epub">EPUB</option>
-              <option value="docx">DOCX</option>
-              <option value="txt">TXT</option>
-              <option value="md">Markdown</option>
-            </select>
-            <label class="flex items-center gap-2 text-sm">
-              <input type="checkbox" /> Bilingual
-            </label>
-            <button class="w-full px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition">
-              Export
-            </button>
-          </div>
-        </div>
-
-        <!-- Unit Editor -->
-        {#if selectedUnit}
-          <div class="border border-gray-200 rounded-lg p-6 bg-gray-50">
-            <h3 class="text-sm font-semibold text-gray-900 mb-4">Edit Unit</h3>
-            <div class="space-y-4">
-              <div>
-                <label class="block text-xs font-medium text-gray-700 mb-1">Source</label>
-                <div class="p-3 bg-white border border-gray-300 rounded text-sm text-gray-700">
-                  {selectedUnit.source_text}
-                </div>
-              </div>
-              <div>
-                <label class="block text-xs font-medium text-gray-700 mb-1">Translation</label>
-                <textarea bind:value={selectedUnit.translated_text} rows="4" class="w-full p-3 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-indigo-500" />
-              </div>
-              <div class="flex gap-2">
-                <button onclick={() => updateUnit(selectedUnit.id, 'edit', selectedUnit.translated_text || '')} class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition">
-                  Save
-                </button>
-                <button onclick={() => selectedUnit = null} class="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition">
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        {/if}
-      </div>
+    <div class="p-4 bg-yellow-50 border border-yellow-200 rounded-md text-yellow-800 text-sm">
+      Loading project...
     </div>
+  {/if}
+
+  {#if error}
+    <div class="p-4 bg-red-50 border border-red-200 rounded-md text-red-800 text-sm">{error}</div>
+  {/if}
+
+  {#if project}
+    <div class="border border-gray-200 rounded-lg p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg font-semibold text-gray-900">{project.name}</h2>
+        <p class="text-sm text-gray-500">{project.source_file}</p>
+      </div>
+      <p class="text-sm text-gray-500">{project.source_format}</p>
+    </div>
+
+    {#if units.length > 0}
+      <div class="border border-gray-200 rounded-lg">
+        <div class="p-4 border-b border-gray-200">
+          <h2 class="text-lg font-semibold text-gray-900">Units ({units.length})</h2>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-4 py-3 font-medium text-gray-600">Source</th>
+                <th class="px-4 py-3 font-medium text-gray-600">Translation</th>
+                <th class="px-4 py-3 font-medium text-gray-600">State</th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each units as unit}
+                <tr class="border-b border-gray-100 hover:bg-gray-50">
+                  <td class="px-4 py-3 text-gray-700 max-w-xs truncate">{unit.source_text}</td>
+                  <td class="px-4 py-3">{unit.translated_text ?? '—'}</td>
+                  <td class="px-4 py-3">
+                    <span class="text-xs font-semibold uppercase">{unit.state}</span>
+                  </td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    {/if}
   {/if}
 </div>

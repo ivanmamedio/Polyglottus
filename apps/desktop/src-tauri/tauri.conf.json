@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "identifier": "org.polyglottus.Polyglottus",
   "build": {
-    "beforeBuildCommand": "npm run build --prefix ../ui",
+    "beforeBuildCommand": "",
     "beforeDevCommand": "npm run dev --prefix ../ui",
     "devUrl": "http://localhost:1420"
   },
@@ -26,13 +26,6 @@
   "bundle": {
     "active": true,
     "targets": "all",
-    "icon": [
-      "icons/32x32.png",
-      "icons/128x128.png",
-      "icons/128x128@2x.png",
-      "icons/icon.icns",
-      "icons/icon.ico"
-    ],
     "resources": [],
     "externalBin": [],
     "copyright": "© 2024 Polyglottus Contributors",

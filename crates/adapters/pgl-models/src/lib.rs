@@ -8,6 +8,7 @@ use pgl_app::{ModelCatalog, ModelsError, HardwareProfile, GpuInfo, ModelRecommen
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use std::sync::Arc;
 
 /// Configuração do catálogo de modelos
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -81,7 +82,7 @@ impl ModelCatalog for ModelCatalogImpl {
         })
     }
 
-    async fn download_model(&self, _model_id: &str, _progress: &dyn Fn(u64, u64)) -> Result<ModelInfo, ModelsError> {
+    async fn download_model(&self, _model_id: &str, _progress: Arc<dyn Fn(u64, u64) + Send + Sync>) -> Result<ModelInfo, ModelsError> {
         Err(ModelsError::NotFound("Stub: download not implemented".into()))
     }
 

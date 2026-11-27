@@ -477,7 +477,7 @@ pub enum SecretsError {
 pub trait ModelCatalog: Send + Sync + 'static {
     async fn detect_hardware(&self) -> Result<HardwareProfile, ModelsError>;
     async fn recommend_model(&self, profile: &HardwareProfile, lang_pair: &LangPair) -> Result<ModelRecommendation, ModelsError>;
-    async fn download_model(&self, model_id: &str, progress: &dyn Fn(u64, u64)) -> Result<ModelInfo, ModelsError>;
+    async fn download_model(&self, model_id: &str, progress: Arc<dyn Fn(u64, u64) + Send + Sync>) -> Result<ModelInfo, ModelsError>;
     async fn list_installed(&self) -> Result<Vec<ModelInfo>, ModelsError>;
     async fn remove_model(&self, model_id: &str) -> Result<(), ModelsError>;
     async fn get_model_path(&self, model_id: &str) -> Result<Option<std::path::PathBuf>, ModelsError>;
@@ -968,7 +968,7 @@ impl<W: FormatWriter, Repo: ProjectRepository> ExportBook<W, Repo> {
 }
 
 pub struct JobTranslationLookup<'a> {
-    job: &'a Job,
+    pub job: &'a Job,
 }
 
 impl<'a> TranslationLookup for JobTranslationLookup<'a> {
@@ -998,8 +998,8 @@ pub mod registry {
     use std::sync::Arc;
 
     pub struct FormatRegistry {
-        readers: Vec<Arc<dyn FormatReader>>,
-        writers: Vec<Arc<dyn FormatWriter>>,
+        readers: Vec<Arc<dyn FormatReader + Send + Sync>>,
+        writers: Vec<Arc<dyn FormatWriter + Send + Sync>>,
     }
 
     impl FormatRegistry {
@@ -1007,18 +1007,18 @@ pub mod registry {
             Self { readers: Vec::new(), writers: Vec::new() }
         }
 
-        pub fn register_reader(&mut self, reader: Arc<dyn FormatReader>) {
+        pub fn register_reader(&mut self, reader: Arc<dyn FormatReader + Send + Sync>) {
             self.readers.push(reader);
         }
 
-        pub fn register_writer(&mut self, writer: Arc<dyn FormatWriter>) {
+        pub fn register_writer(&mut self, writer: Arc<dyn FormatWriter + Send + Sync>) {
             self.writers.push(writer);
         }
 
-        pub fn readers(&self) -> &[Arc<dyn FormatReader>] { &self.readers }
-        pub fn writers(&self) -> &[Arc<dyn FormatWriter>] { &self.writers }
+        pub fn readers(&self) -> &[Arc<dyn FormatReader + Send + Sync>] { &self.readers }
+        pub fn writers(&self) -> &[Arc<dyn FormatWriter + Send + Sync>] { &self.writers }
 
-        pub fn find_reader(&self, path: &Path) -> Option<Arc<dyn FormatReader>> {
+        pub fn find_reader(&self, path: &Path) -> Option<Arc<dyn FormatReader + Send + Sync>> {
             let name = path.file_name().and_then(|s| s.to_str()).unwrap_or("");
             let head = std::fs::read(path).ok()?.into_iter().take(1024).collect::<Vec<_>>();
 

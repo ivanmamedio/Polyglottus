@@ -4,7 +4,7 @@
 #![warn(missing_docs)]
 #![warn(clippy::all, clippy::pedantic, clippy::nursery, clippy::cargo)]
 
-use pgl_app::{ImportBook, PlanTranslation, ExecuteJob, EventSink, AppEvent, JobTranslationLookup, prelude::FormatRegistry, SecretStore, ProjectRepository, ModelCatalog, HardwareProfile, ModelsError, LangPair, ModelRecommendation, ModelInfo};
+use pgl_app::{ImportBook, PlanTranslation, ExecuteJob, EventSink, AppEvent, JobTranslationLookup, prelude::FormatRegistry, SecretStore, ProjectRepository, ModelCatalog, HardwareProfile, ModelsError, LangPair, ModelRecommendation, ModelInfo, ExportOptions, OutputFormat};
 use pgl_domain::{Language};
 use pgl_fmt_epub::{EpubReader, EpubWriter};
 use pgl_fmt_ooxml::{DocxReader, DocxWriter, PptxReader, PptxWriter, XlsxReader, XlsxWriter};
@@ -41,7 +41,7 @@ impl ModelCatalog for MutexModelCatalog {
     async fn recommend_model(&self, profile: &HardwareProfile, lang_pair: &LangPair) -> Result<ModelRecommendation, ModelsError> {
         self.inner.lock().await.recommend_model(profile, lang_pair).await
     }
-    async fn download_model(&self, model_id: &str, progress: &dyn Fn(u64, u64)) -> Result<ModelInfo, ModelsError> {
+    async fn download_model(&self, model_id: &str, progress: Arc<dyn Fn(u64, u64) + Send + Sync>) -> Result<ModelInfo, ModelsError> {
         self.inner.lock().await.download_model(model_id, progress).await
     }
     async fn list_installed(&self) -> Result<Vec<ModelInfo>, ModelsError> {
@@ -607,7 +607,7 @@ async fn recommend_model(state: State<'_, AppState>, target_lang: String) -> Res
 
 #[tauri::command]
 async fn download_model(state: State<'_, AppState>, _window: Window, model_id: String) -> Result<(), String> {
-    state.catalog.download_model(&model_id, &|_, _| {}).await.map(|_| ()).map_err(|e| e.to_string())
+    state.catalog.download_model(&model_id, Arc::new(|_, _| {})).await.map(|_| ()).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
