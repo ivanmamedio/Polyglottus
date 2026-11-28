@@ -24,6 +24,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tracing::error;
+use async_trait::async_trait;
 use specta::Type;
 use ts_rs::TS;
 
@@ -33,7 +34,7 @@ struct MutexModelCatalog {
     inner: Arc<Mutex<ModelCatalogImpl>>,
 }
 
-#[async_trait::async_trait]
+#[async_trait]
 impl ModelCatalog for MutexModelCatalog {
     async fn detect_hardware(&self) -> Result<HardwareProfile, ModelsError> {
         self.inner.lock().await.detect_hardware().await
@@ -299,7 +300,7 @@ struct TauriEventSink {
     window: Window,
 }
 
-#[async_trait::async_trait]
+#[async_trait]
 impl EventSink for TauriEventSink {
     async fn emit(&self, event: AppEvent) {
         let _ = self.window.emit("app-event", event);

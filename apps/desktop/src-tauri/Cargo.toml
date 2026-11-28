@@ -2,9 +2,22 @@
 name = "polyglottus-desktop"
 version = "0.1.0"
 edition = "2021"
-description = "Polyglottus Desktop App (Tauri)"
 
 [dependencies]
+pgl-app = { workspace = true }
+pgl-domain = { workspace = true }
+pgl-fmt-text = { workspace = true }
+pgl-fmt-epub = { workspace = true }
+pgl-fmt-ooxml = { workspace = true }
+pgl-fmt-odf = { workspace = true }
+pgl-fmt-pdf = { workspace = true }
+pgl-fmt-convert = { workspace = true }
+pgl-provider-openai = { workspace = true }
+pgl-provider-ollama = { workspace = true }
+pgl-models = { workspace = true }
+pgl-ocr = { workspace = true }
+pgl-storage = { workspace = true }
+pgl-secrets = { workspace = true }
 tauri = { workspace = true }
 tauri-plugin-dialog = { workspace = true }
 tauri-plugin-fs = { workspace = true }
@@ -12,32 +25,15 @@ tauri-plugin-shell = { workspace = true }
 tauri-plugin-opener = { workspace = true }
 tauri-plugin-store = { workspace = true }
 tauri-plugin-sql = { workspace = true }
-
-pgl-app = { workspace = true }
-pgl-domain = { workspace = true }
-pgl-fmt-text = { workspace = true }
-pgl-fmt-pdf = { workspace = true }
-pgl-fmt-epub = { workspace = true }
-pgl-fmt-ooxml = { workspace = true }
-pgl-fmt-odf = { workspace = true }
-pgl-fmt-convert = { workspace = true }
-pgl-provider-openai = { workspace = true }
-pgl-provider-ollama = { workspace = true }
-# pgl-provider-embedded = { workspace = true }  # Disabled: needs llama-cpp-sys-2 build tools
-pgl-ocr = { workspace = true }
-pgl-storage = { workspace = true }
-pgl-secrets = { workspace = true }
-pgl-models = { workspace = true }
-async-trait = { workspace = true }
-
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
+async-trait = { workspace = true }
 tracing = { workspace = true }
 anyhow = { workspace = true }
 uuid = { workspace = true }
-specta = { version = "2.0.0-rc.27", features = ["derive"] }
-ts-rs = { version = "7", features = [] }
+specta = { workspace = true }
+ts-rs = { workspace = true }
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
