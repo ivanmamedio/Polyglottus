@@ -100,7 +100,7 @@ pub async fn open_html(path: &Path) -> Result<SourceDoc, FormatError> {
         .with_not_preserved("Scripts executáveis")
         .with_warning("JavaScript que manipula DOM pode quebrar com texto traduzido");
 
-    let empty_archive = ZipArchive::new(std::io::Cursor::new(Vec::new()))?;
+    let empty_archive = ZipArchive::new(std::io::Cursor::new(pgl_fmt_core::create_empty_zip())).unwrap();
 
     Ok(Box::new(ZipSourceDocument::new(
         empty_archive, units, vec![], fidelity, Default::default()
@@ -156,7 +156,7 @@ mod tests {
         let mut f = NamedTempFile::new().unwrap();
         writeln!(f, "<html><body><h1>Title</h1><p>Paragraph</p></body></html>").unwrap();
 
-        let units = open_html(f.path()).await.unwrap();
+        let mut units = open_html(f.path()).await.unwrap();
         let units_vec: Vec<_> = units.units().collect();
         assert!(!units_vec.is_empty());
     }
@@ -166,7 +166,7 @@ mod tests {
         let mut f = NamedTempFile::new().unwrap();
         writeln!(f, "<html><body><p>Hello world</p></body></html>").unwrap();
 
-        let units = open_html(f.path()).await.unwrap();
+        let mut units = open_html(f.path()).await.unwrap();
         let units_vec: Vec<_> = units.units().collect();
         assert_eq!(units_vec.len(), 1);
 
@@ -175,6 +175,9 @@ mod tests {
         impl TranslationLookup for EmptyLookup {
             fn get(&self, _unit_id: &UnitId) -> Option<MarkedText> {
                 None
+            }
+            fn get_section(&self, _section: &SectionId) -> Vec<(UnitId, MarkedText)> {
+                Vec::new()
             }
         }
 
